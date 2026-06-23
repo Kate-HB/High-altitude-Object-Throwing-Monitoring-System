@@ -1,0 +1,90 @@
+:root {
+  color: #d9e7e8;
+  background: #071315;
+  font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+  background:
+    linear-gradient(rgba(33, 91, 94, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(33, 91, 94, 0.08) 1px, transparent 1px),
+    radial-gradient(circle at 50% 20%, #123033 0, #071315 55%);
+  background-size: 32px 32px, 32px 32px, auto;
+}
+
+.status-card {
+  width: min(100%, 560px);
+  padding: 48px;
+  border: 1px solid #24494c;
+  background: rgba(9, 27, 29, 0.92);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+}
+
+.eyebrow {
+  margin: 0 0 20px;
+  color: #6ea9ad;
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+}
+
+h1 {
+  margin: 0;
+  color: #f1f7f7;
+  font-size: clamp(32px, 7vw, 52px);
+  line-height: 1.15;
+}
+
+.description {
+  margin: 18px 0 34px;
+  color: #91a8aa;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 22px;
+  border-top: 1px solid #24494c;
+  color: #e3a462;
+  font-weight: 700;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 16px currentColor;
+}
+
+.status.online {
+  color: #55d6a4;
+}
+
+@media (max-width: 520px) {
+  .status-card {
+    padding: 32px 24px;
+  }
+}
