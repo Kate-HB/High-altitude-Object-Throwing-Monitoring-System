@@ -24,7 +24,7 @@ git --version
 
 ```powershell
 git clone <仓库地址>
-Set-Location "High-altitude Object Throwing Monitoring System"
+Set-Location "High-altitude-Object-Throwing-Monitoring-System"
 ```
 
 已有本地仓库时：
