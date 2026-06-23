@@ -21,7 +21,7 @@ onMounted(async () => {
     <section class="status-card">
       <p class="eyebrow">AI PRODUCTION PRACTICE</p>
       <h1>高空抛物监测系统</h1>
-      <p class="description">系统框架运行状态</p>
+      <p class="description">系统框架运行正常</p>
       <div
         class="status"
         :class="{ online }"
