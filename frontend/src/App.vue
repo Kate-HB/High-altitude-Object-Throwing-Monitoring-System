@@ -22,7 +22,12 @@ onMounted(async () => {
       <p class="eyebrow">AI PRODUCTION PRACTICE</p>
       <h1>高空抛物监测系统</h1>
       <p class="description">系统框架运行状态</p>
-      <div class="status" :class="{ online }">
+      <div
+        class="status"
+        :class="{ online }"
+        role="status"
+        aria-live="polite"
+      >
         <span class="status-dot" aria-hidden="true"></span>
         {{ status }}
       </div>
