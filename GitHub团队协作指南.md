@@ -368,7 +368,29 @@ Closes #12
 - 是否破坏原有功能。
 - 是否提供必要测试。
 
-若有问题，在PR中写明修改位置和原因。开发者修改后继续：
+**审核操作方式：**
+
+在GitHub打开PR，进入**Files changed**标签，逐文件查看改动。对有问题代码行悬停点击蓝色`+`写评论。
+
+全部看完后点右上角**Review changes**：
+
+- **Comment**：有意见但不做决定。
+- **Approve**：代码合格，准许合并。
+- **Request changes**：存在必须修改的问题。
+
+若需要本地跑代码验证：
+
+```bash
+git fetch origin
+git switch -c review/某人-某功能 origin/feature/某人-某功能
+# 启动前后端手动验证
+git switch dev
+git branch -d review/某人-某功能
+```
+
+发现小问题直接在PR行评论；大问题点**Request changes**。验证通过后点**Squash and merge**合并。
+
+审核人有问题时在PR中写明修改位置和原因。开发者修改后继续：
 
 ```bash
 git add 具体文件
