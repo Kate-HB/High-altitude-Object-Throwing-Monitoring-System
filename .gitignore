@@ -28,5 +28,7 @@ frontend/dist/
 *.mkv
 .idea/
 .vscode/
+.claude/
+.agents/
 .DS_Store
 Thumbs.db
