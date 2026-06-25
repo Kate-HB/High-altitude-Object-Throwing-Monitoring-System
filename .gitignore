@@ -29,6 +29,7 @@ frontend/dist/
 .idea/
 .vscode/
 .claude/
+*负责人任务清单.md
 .agents/
 .DS_Store
 Thumbs.db
