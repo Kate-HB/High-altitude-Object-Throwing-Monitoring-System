@@ -29,6 +29,7 @@ frontend/dist/
 .idea/
 .vscode/
 .claude/
+*个人开发计划.md
 
 .agents/
 .DS_Store
