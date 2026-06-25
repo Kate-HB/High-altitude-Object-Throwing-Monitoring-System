@@ -1,90 +1,150 @@
+/* ===== 深色科技风全局样式 ===== */
+
 :root {
-  color: #d9e7e8;
-  background: #071315;
-  font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  color: #eaf6ff;
+  background: #07111f;
+  font-family:
+    "Microsoft YaHei",
+    "PingFang SC",
+    "Segoe UI",
+    sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  min-width: 320px;
+  min-width: 1280px;
   min-height: 100vh;
-  margin: 0;
+  background: #07111f;
 }
 
-button,
-input {
-  font: inherit;
+/* ===== Element Plus 深色覆盖 ===== */
+
+/* 输入框 */
+.el-input__wrapper {
+  background: #0d1a2b !important;
+  border-color: #1e3a5f !important;
+  box-shadow: none !important;
+}
+.el-input__wrapper:focus-within,
+.el-input__wrapper.is-focus {
+  border-color: #00d8ff !important;
+}
+.el-input__inner {
+  color: #eaf6ff !important;
+}
+.el-input__inner::placeholder {
+  color: #52657f !important;
 }
 
-.shell {
-  display: grid;
-  min-height: 100vh;
-  place-items: center;
-  padding: 24px;
-  background:
-    linear-gradient(rgba(33, 91, 94, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(33, 91, 94, 0.08) 1px, transparent 1px),
-    radial-gradient(circle at 50% 20%, #123033 0, #071315 55%);
-  background-size: 32px 32px, 32px 32px, auto;
+/* 菜单 */
+.el-menu {
+  background: transparent !important;
 }
 
-.status-card {
-  width: min(100%, 560px);
-  padding: 48px;
-  border: 1px solid #24494c;
-  background: rgba(9, 27, 29, 0.92);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+/* 按钮 */
+.el-button--primary {
+  background: #00d8ff !important;
+  border-color: #00d8ff !important;
+  color: #04101c !important;
+}
+.el-button--primary:hover {
+  background: #33e3ff !important;
+}
+.el-button--primary.is-disabled {
+  background: #1e3a5f !important;
+  border-color: #1e3a5f !important;
+  color: #52657f !important;
 }
 
-.eyebrow {
-  margin: 0 0 20px;
-  color: #6ea9ad;
-  font-family: Consolas, monospace;
-  font-size: 12px;
-  letter-spacing: 0.2em;
+/* 表格 */
+.el-table {
+  background: transparent !important;
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: #0d1a2b;
+  --el-table-border-color: #1e3a5f;
+}
+.el-table th.el-table__cell {
+  background: #0d1a2b;
+  color: #91a8c7;
+}
+.el-table tr {
+  background: transparent;
+}
+.el-table tr:hover > td {
+  background: rgba(0, 216, 255, 0.08) !important;
 }
 
-.status-card h1 {
-  margin: 0;
-  color: #f1f7f7;
-  font-size: clamp(32px, 7vw, 52px);
-  line-height: 1.15;
+/* 表单 */
+.el-form-item__label {
+  color: #91a8c7 !important;
 }
 
-.description {
-  margin: 18px 0 34px;
-  color: #91a8aa;
+/* 空状态 */
+.el-empty__description {
+  color: #52657f !important;
 }
 
-.status {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-top: 22px;
-  border-top: 1px solid #24494c;
-  color: #e3a462;
-  font-weight: 700;
+/* 弹窗 */
+.el-dialog {
+  background: #101f33 !important;
+  border: 1px solid #1e3a5f !important;
+}
+.el-dialog__title {
+  color: #eaf6ff !important;
 }
 
-.status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: currentColor;
-  box-shadow: 0 0 16px currentColor;
+/* 标签 */
+.el-tag--success {
+  background: rgba(0, 255, 178, 0.16) !important;
+  border-color: #00ffb2 !important;
+  color: #00ffb2 !important;
+}
+.el-tag--warning {
+  background: rgba(255, 176, 32, 0.16) !important;
+  border-color: #ffb020 !important;
+  color: #ffb020 !important;
+}
+.el-tag--danger {
+  background: rgba(255, 77, 79, 0.16) !important;
+  border-color: #ff4d4f !important;
+  color: #ff4d4f !important;
+}
+.el-tag--info {
+  background: rgba(82, 101, 127, 0.16) !important;
+  border-color: #52657f !important;
+  color: #91a8c7 !important;
 }
 
-.status.online {
-  color: #55d6a4;
+/* 进度条 */
+.el-progress-bar__outer {
+  background: #0d1a2b !important;
+}
+.el-progress-bar__inner {
+  background: linear-gradient(90deg, #00d8ff, #00ffb2) !important;
 }
 
-@media (max-width: 520px) {
-  .status-card {
-    padding: 32px 24px;
-  }
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0b1728;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e3a5f;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2a5080;
 }
