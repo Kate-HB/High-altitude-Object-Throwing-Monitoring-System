@@ -1,0 +1,59 @@
+"""Pydantic request/response models and unified response helpers."""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+
+# ── Unified response helpers ──────────────────────────────────────────
+
+def success_response(data: Any = None, message: str = "success") -> dict[str, Any]:
+    return {"code": 200, "message": message, "data": data}
+
+
+def error_response(
+    code: int, message: str, detail: str | dict[str, Any]
+) -> dict[str, Any]:
+    return {"code": code, "message": message, "detail": detail}
+
+
+def now_str() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+# ── Request models ────────────────────────────────────────────────────
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class ROIRequest(BaseModel):
+    roi_x: int = 0
+    roi_y: int = 0
+    roi_width: int | None = None
+    roi_height: int | None = None
+    detect_confidence: float = 0.35
+
+
+class EventStatusUpdate(BaseModel):
+    status: str  # unconfirmed / confirmed / false_alarm
+
+
+class SettingsUpdate(BaseModel):
+    detect_confidence: float
+    downward_ratio: float
+    min_vertical_distance: int
+    min_track_frames: int
+    roi_required_ratio: float
+    alarm_cooldown_seconds: int
+
+
+class CameraStartRequest(BaseModel):
+    camera_index: int = 0
+    width: int = 640
+    height: int = 480
