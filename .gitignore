@@ -30,7 +30,7 @@ frontend/dist/
 .vscode/
 .claude/
 *个人开发计划.md
-docs/weekly/
+
 .agents/
 .DS_Store
 Thumbs.db
