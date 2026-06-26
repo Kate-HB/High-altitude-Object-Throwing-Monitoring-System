@@ -31,12 +31,18 @@
 - `services/task_service.py` — 任务CRUD+后台线程框架
 - 10个新测试，全部63个测试通过
 
-## 明日计划（6月28日）
+### 6月28日
+- `services/event_service.py` — 事件CRUD服务（list/get/update + batch写入3表）
+- `api/events.py` — `GET /api/events` + `GET /api/events/{id}` + `PATCH /api/events/{id}/status`
+- `main.py` — 注册events路由
+- 19个新测试，全量82个测试通过
+- 算法占位未解除，事件写入路径框架保留，batch_insert签名不变
 
-- 事件写入服务 `services/event_service.py`
-- 事件列表/详情/状态更新接口 `api/events.py`
-- 算法Pipeline与后台线程集成
-- events/detection/tracking批量入库
+## 明日计划（6月29日）
+
+- 文件访问接口（截图、结果视频）
+- 配合杨锦辉联调事件入库验证
+- 统计接口 `GET /api/statistics/overview`
 
 ## 技术笔记
 
