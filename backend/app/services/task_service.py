@@ -99,15 +99,13 @@ def _run_analysis(task_id: int, roi: dict[str, int], settings: dict[str, Any]) -
             logger.error("Task %d: not found", task_id)
             return
 
-        from algorithm.pipeline import AnalysisPipeline
+        from algorithm.pipeline import run_video_analysis
 
-        pipeline = AnalysisPipeline()
-        result = pipeline.analyze(
-            source=task["source_path"],
-            roi=[(roi.get("x", 0), roi.get("y", 0)),
-                 (roi.get("x", 0) + (roi.get("width") or 0),
-                  roi.get("y", 0) + (roi.get("height") or 0))] if roi else None,
-            detection_params=settings,
+        result = run_video_analysis(
+            video_path=task["source_path"],
+            output_dir="uploads/results",
+            roi=roi or {},
+            settings=settings,
         )
 
         if result.status == "success":
@@ -115,22 +113,22 @@ def _run_analysis(task_id: int, roi: dict[str, int], settings: dict[str, Any]) -
                 task_id,
                 status="success",
                 processed_frames=task["total_frames"],
-                result_video_path=getattr(result, "result_video_path", None),
+                result_video_path=result.result_video_path,
             )
             _write_events(task_id, result.events)
-            _write_detections(task_id, result.detections)
-            _write_tracks(task_id, result.tracks)
+            _write_detections(task_id, result.detection_results)
+            _write_tracks(task_id, result.tracking_results)
         elif result.status == "not_ready":
             update_task(
                 task_id,
                 status="failed",
-                error_message=result.message or "算法模块未就绪",
+                error_message=result.error_message or "算法模块未就绪",
             )
         else:
             update_task(
                 task_id,
                 status="failed",
-                error_message=getattr(result, "error_message", None) or result.message,
+                error_message=result.error_message or "未知错误",
             )
 
         logger.info("Task %d: completed with status=%s", task_id, result.status)
