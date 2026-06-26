@@ -28,13 +28,19 @@
   - Canvas ROI矩形绘制（鼠标拖拽）
   - 分析进度轮询+事件列表展示
 
-## 明日计划（6月28日）
+### 6月28日
+- ROI完善：8个resize handles（四角+四边中点）、触摸支持（touch事件）、Delete键清除
+- 进度条升级：el-progress组件替代自定义div，status颜色随任务状态
+- 事件API对接：`fetchEvents({task_id})` + `updateEventStatus(id, status)` 确认/误报
+- 事件列表：右侧面板展示检出事件，支持一键确认/误报
+- 3个新Playwright测试，全量20个测试通过
 
-- 完善ROI交互（调整大小、触摸支持）
+## 明日计划（6月29日）
+
 - 报警中心页 `AlarmCenterView.vue`
 - 历史事件页 `HistoryView.vue`
-- 结果视频回放组件
-- 对接事件接口
+- 结果视频回放组件完善
+- 截图预览功能
 
 ## 技术笔记
 
