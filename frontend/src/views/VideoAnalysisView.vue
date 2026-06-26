@@ -67,22 +67,22 @@ const roiBeforeResize = ref(null)
 const canvasWidth = ref(640)
 const canvasHeight = ref(360)
 
-const HANDLE_SIZE = 8
+const HANDLE_SIZE = 12
+const HANDLE_HIT = 16
 
 function getHandleRects(r) {
   if (!r.width || !r.height) return []
-  const hw = HANDLE_SIZE / 2
   const cx = r.x + r.width / 2
   const cy = r.y + r.height / 2
   return [
-    { key: 'nw', x: r.x - hw, y: r.y - hw, w: HANDLE_SIZE, h: HANDLE_SIZE, cursor: 'nw-resize' },
-    { key: 'n',  x: cx - hw,  y: r.y - hw, w: HANDLE_SIZE, h: HANDLE_SIZE, cursor: 'n-resize' },
-    { key: 'ne', x: r.x + r.width - hw, y: r.y - hw, w: HANDLE_SIZE, h: HANDLE_SIZE, cursor: 'ne-resize' },
-    { key: 'e',  x: r.x + r.width - hw, y: cy - hw, w: HANDLE_SIZE, h: HANDLE_SIZE, cursor: 'e-resize' },
-    { key: 'se', x: r.x + r.width - hw, y: r.y + r.height - hw, w: HANDLE_SIZE, h: HANDLE_SIZE, cursor: 'se-resize' },
-    { key: 's',  x: cx - hw,  y: r.y + r.height - hw, w: HANDLE_SIZE, h: HANDLE_SIZE, cursor: 's-resize' },
-    { key: 'sw', x: r.x - hw, y: r.y + r.height - hw, w: HANDLE_SIZE, h: HANDLE_SIZE, cursor: 'sw-resize' },
-    { key: 'w',  x: r.x - hw, y: cy - hw, w: HANDLE_SIZE, h: HANDLE_SIZE, cursor: 'w-resize' },
+    { key: 'nw', x: r.x, y: r.y, cursor: 'nwse-resize' },
+    { key: 'n',  x: cx, y: r.y, cursor: 'ns-resize' },
+    { key: 'ne', x: r.x + r.width, y: r.y, cursor: 'nesw-resize' },
+    { key: 'e',  x: r.x + r.width, y: cy, cursor: 'ew-resize' },
+    { key: 'se', x: r.x + r.width, y: r.y + r.height, cursor: 'nwse-resize' },
+    { key: 's',  x: cx, y: r.y + r.height, cursor: 'ns-resize' },
+    { key: 'sw', x: r.x, y: r.y + r.height, cursor: 'nesw-resize' },
+    { key: 'w',  x: r.x, y: cy, cursor: 'ew-resize' },
   ]
 }
 
@@ -90,11 +90,20 @@ function hitTestHandle(pos) {
   if (!roi.value.width || !roi.value.height) return null
   const handles = getHandleRects(roi.value)
   for (const h of handles) {
-    if (pos.x >= h.x && pos.x <= h.x + h.w && pos.y >= h.y && pos.y <= h.y + h.h) {
-      return h.key
+    if (Math.abs(pos.x - h.x) <= HANDLE_HIT && Math.abs(pos.y - h.y) <= HANDLE_HIT) {
+      return { key: h.key, cursor: h.cursor }
     }
   }
   return null
+}
+
+// hover cursor feedback
+const canvasCursor = ref('crosshair')
+function updateCursor(e) {
+  if (drawing.value || resizing.value) return
+  const pos = getCanvasPos(e)
+  const h = hitTestHandle(pos)
+  canvasCursor.value = h ? h.cursor : 'crosshair'
 }
 
 function onVideoLoad() {
@@ -114,32 +123,79 @@ function drawVideoFrame() {
   const c = canvasRef.value
   if (!v || !c) return
   const ctx = c.getContext('2d')
-  ctx.drawImage(v, 0, 0, c.width, c.height)
+  const W = c.width, H = c.height
+  ctx.drawImage(v, 0, 0, W, H)
   const r = roi.value
   if (r.width && r.height) {
-    // ROI rectangle
+    // Dim overlay outside ROI
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'
+    ctx.fillRect(0, 0, W, r.y)
+    ctx.fillRect(0, r.y, r.x, r.height)
+    ctx.fillRect(r.x + r.width, r.y, W - r.x - r.width, r.height)
+    ctx.fillRect(0, r.y + r.height, W, H - r.y - r.height)
+
+    // ROI border — solid line
     ctx.strokeStyle = '#00d8ff'
-    ctx.lineWidth = 2
-    ctx.setLineDash([6, 3])
-    ctx.strokeRect(r.x, r.y, r.width, r.height)
+    ctx.lineWidth = 2.5
     ctx.setLineDash([])
-    // Resize handles
-    ctx.fillStyle = '#00d8ff'
+    ctx.strokeRect(r.x, r.y, r.width, r.height)
+
+    // Inner glow
+    ctx.strokeStyle = 'rgba(0,216,255,0.25)'
+    ctx.lineWidth = 6
+    ctx.strokeRect(r.x, r.y, r.width, r.height)
+
+    // Corner accent L-lines
+    const cl = Math.min(r.width, r.height, 40) * 0.45
+    ctx.strokeStyle = '#00d8ff'
+    ctx.lineWidth = 2.5
+    ctx.beginPath()
+    ctx.moveTo(r.x, r.y + cl); ctx.lineTo(r.x, r.y); ctx.lineTo(r.x + cl, r.y)
+    ctx.moveTo(r.x + r.width - cl, r.y); ctx.lineTo(r.x + r.width, r.y); ctx.lineTo(r.x + r.width, r.y + cl)
+    ctx.moveTo(r.x + r.width, r.y + r.height - cl); ctx.lineTo(r.x + r.width, r.y + r.height); ctx.lineTo(r.x + r.width - cl, r.y + r.height)
+    ctx.moveTo(r.x + cl, r.y + r.height); ctx.lineTo(r.x, r.y + r.height); ctx.lineTo(r.x, r.y + r.height - cl)
+    ctx.stroke()
+
+    // Resize handles — white-filled circles with cyan ring
     for (const h of getHandleRects(r)) {
-      ctx.fillRect(h.x, h.y, h.w, h.h)
+      ctx.beginPath()
+      ctx.arc(h.x, h.y, HANDLE_SIZE / 2, 0, Math.PI * 2)
+      ctx.fillStyle = '#fff'
+      ctx.fill()
+      ctx.strokeStyle = '#00d8ff'
+      ctx.lineWidth = 2
+      ctx.stroke()
     }
   }
 }
 
 function getCanvasPos(e) {
   const rect = canvasRef.value.getBoundingClientRect()
-  const scaleX = canvasWidth.value / rect.width
-  const scaleY = canvasHeight.value / rect.height
   const clientX = e.touches ? e.touches[0].clientX : e.clientX
   const clientY = e.touches ? e.touches[0].clientY : e.clientY
+  const px = clientX - rect.left
+  const py = clientY - rect.top
+
+  // Account for object-fit: contain letterboxing
+  const cw = canvasWidth.value
+  const ch = canvasHeight.value
+  const canvasAspect = cw / ch
+  const rectAspect = rect.width / rect.height
+  let drawW, drawH, offsetX, offsetY
+  if (canvasAspect > rectAspect) {
+    drawW = rect.width
+    drawH = rect.width / canvasAspect
+    offsetX = 0
+    offsetY = (rect.height - drawH) / 2
+  } else {
+    drawH = rect.height
+    drawW = rect.height * canvasAspect
+    offsetX = (rect.width - drawW) / 2
+    offsetY = 0
+  }
   return {
-    x: Math.round((clientX - rect.left) * scaleX),
-    y: Math.round((clientY - rect.top) * scaleY),
+    x: Math.round(((px - offsetX) / drawW) * cw),
+    y: Math.round(((py - offsetY) / drawH) * ch),
   }
 }
 
@@ -157,11 +213,11 @@ function clampROI(r) {
 function onPointerDown(e) {
   e.preventDefault()
   const pos = getCanvasPos(e)
-  const handle = hitTestHandle(pos)
+  const h = hitTestHandle(pos)
 
-  if (handle) {
+  if (h) {
     resizing.value = true
-    resizeHandle.value = handle
+    resizeHandle.value = h.key
     roiBeforeResize.value = { ...roi.value }
     drawStart.value = pos
   } else {
@@ -201,6 +257,8 @@ function onPointerMove(e) {
       height: Math.abs(pos.y - drawStart.value.y),
     })
     drawVideoFrame()
+  } else {
+    updateCursor(e)
   }
 }
 
@@ -373,6 +431,7 @@ function reset() {
   processedFrames.value = 0
   resultVideoPath.value = ''
   uploadProgress.value = 0
+  if (fileInput.value) fileInput.value.value = ''
   if (videoUrl.value) { URL.revokeObjectURL(videoUrl.value); videoUrl.value = null }
   if (resultVideoUrl.value) { URL.revokeObjectURL(resultVideoUrl.value); resultVideoUrl.value = null }
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
@@ -440,6 +499,7 @@ function reset() {
             :width="canvasWidth"
             :height="canvasHeight"
             class="roi-canvas"
+            :style="{ cursor: canvasCursor }"
             @mousedown="onPointerDown"
             @mousemove="onPointerMove"
             @mouseup="onPointerUp"
@@ -455,23 +515,6 @@ function reset() {
           <div v-if="roi.width" class="roi-readout">
             ROI: ({{ roi.x }}, {{ roi.y }}) {{ roi.width }}×{{ roi.height }}
             <span class="roi-hint">拖拽角点调整 · Delete清除</span>
-          </div>
-        </div>
-
-        <!-- Progress bar -->
-        <div v-if="step === 'running' || step === 'done'" class="panel progress-panel">
-          <h3 class="panel-title">任务进度</h3>
-          <el-progress
-            :percentage="progress"
-            :status="progressStatus"
-            :stroke-width="16"
-            :text-inside="true"
-          />
-          <div class="progress-detail">
-            <span>{{ processedFrames }} / {{ totalFrames || '--' }} 帧</span>
-            <span class="task-status-tag" :style="{ color: statusColor, borderColor: statusColor }">
-              {{ statusText }}
-            </span>
           </div>
         </div>
 
@@ -668,7 +711,6 @@ function reset() {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  cursor: crosshair;
   touch-action: none;
 }
 

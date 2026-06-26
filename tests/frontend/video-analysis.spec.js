@@ -383,8 +383,7 @@ test.describe('视频分析页', () => {
     // Click analyze to start
     await page.click('.analyze-btn')
 
-    // Progress panel should appear during analysis
-    await expect(page.locator('.progress-panel')).toBeVisible({ timeout: 10000 })
-    await expect(page.locator('.el-progress')).toBeVisible()
+    // Sidebar task status should show progress during analysis
+    await expect(page.locator('.task-status')).toContainText('分析中', { timeout: 10000 })
   })
 })
