@@ -7,6 +7,11 @@ import threading
 from typing import Any
 
 from backend.app.core.database import get_db
+from backend.app.services.event_service import (
+    batch_insert_detections,
+    batch_insert_events,
+    batch_insert_tracks,
+)
 
 logger = logging.getLogger("backend.task_service")
 
@@ -99,6 +104,16 @@ def _run_analysis(task_id: int, roi: dict[str, int], settings: dict[str, Any]) -
             logger.error("Task %d: not found", task_id)
             return
 
+        # Save ROI to DB (#003 fix)
+        if roi:
+            update_task(
+                task_id,
+                roi_x=roi.get("x", 0),
+                roi_y=roi.get("y", 0),
+                roi_width=roi.get("width"),
+                roi_height=roi.get("height"),
+            )
+
         from algorithm.pipeline import run_video_analysis
 
         result = run_video_analysis(
@@ -112,12 +127,13 @@ def _run_analysis(task_id: int, roi: dict[str, int], settings: dict[str, Any]) -
             update_task(
                 task_id,
                 status="success",
-                processed_frames=task["total_frames"],
+                total_frames=result.total_frames or task["total_frames"],
+                processed_frames=result.processed_frames or task["total_frames"],
                 result_video_path=result.result_video_path,
             )
-            _write_events(task_id, result.events)
-            _write_detections(task_id, result.detection_results)
-            _write_tracks(task_id, result.tracking_results)
+            batch_insert_events(task_id, result.events)
+            batch_insert_detections(task_id, result.detection_results)
+            batch_insert_tracks(task_id, result.tracking_results)
         elif result.status == "not_ready":
             update_task(
                 task_id,
@@ -136,77 +152,6 @@ def _run_analysis(task_id: int, roi: dict[str, int], settings: dict[str, Any]) -
     except Exception:
         logger.exception("Task %d: unhandled exception", task_id)
         update_task(task_id, status="failed", error_message="后台分析异常")
-
-
-def _write_events(task_id: int, events: list[dict[str, Any]]) -> None:
-    if not events:
-        return
-    db = get_db()
-    for evt in events:
-        db.execute(
-            """INSERT INTO events (video_task_id, track_id, confidence, status,
-               snapshot_path)
-               VALUES (?, ?, ?, ?, ?)""",
-            (
-                task_id,
-                evt.get("track_id"),
-                evt.get("confidence"),
-                "unconfirmed",
-                evt.get("snapshot_path"),
-            ),
-        )
-    db.commit()
-    db.close()
-
-
-def _write_detections(task_id: int, detections: list[dict[str, Any]]) -> None:
-    if not detections:
-        return
-    db = get_db()
-    for det in detections:
-        db.execute(
-            """INSERT INTO detection_results (video_task_id, frame_id,
-               bbox_x, bbox_y, bbox_width, bbox_height, confidence, class_name)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                task_id,
-                det.get("frame_id"),
-                det.get("bbox_x"),
-                det.get("bbox_y"),
-                det.get("bbox_width"),
-                det.get("bbox_height"),
-                det.get("confidence"),
-                det.get("class_name", "falling_object"),
-            ),
-        )
-    db.commit()
-    db.close()
-
-
-def _write_tracks(task_id: int, tracks: list[dict[str, Any]]) -> None:
-    if not tracks:
-        return
-    db = get_db()
-    for trk in tracks:
-        db.execute(
-            """INSERT INTO tracking_results (video_task_id, track_id, frame_id,
-               timestamp, center_x, center_y, bbox_x, bbox_y, bbox_width, bbox_height)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                task_id,
-                trk.get("track_id"),
-                trk.get("frame_id"),
-                trk.get("timestamp"),
-                trk.get("center_x"),
-                trk.get("center_y"),
-                trk.get("bbox_x"),
-                trk.get("bbox_y"),
-                trk.get("bbox_width"),
-                trk.get("bbox_height"),
-            ),
-        )
-    db.commit()
-    db.close()
 
 
 def start_analysis(task_id: int, roi: dict[str, int], settings: dict[str, Any]) -> None:
