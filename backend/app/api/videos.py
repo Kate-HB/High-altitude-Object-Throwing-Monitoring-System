@@ -32,16 +32,19 @@ async def upload_video(
 
     try:
         total_frames = get_total_frames(saved["filepath"])
-    except RuntimeError as e:
+    except (RuntimeError, ModuleNotFoundError) as e:
         return error_response(400, "无法读取视频", str(e))
 
     roi = {"x": roi_x, "y": roi_y, "width": roi_width, "height": roi_height}
-    task_id = create_task(
-        source_type="upload",
-        source_path=saved["filepath"],
-        total_frames=total_frames,
-        roi=roi,
-    )
+    try:
+        task_id = create_task(
+            source_type="upload",
+            source_path=saved["filepath"],
+            total_frames=total_frames,
+            roi=roi,
+        )
+    except Exception as e:
+        return error_response(500, "创建任务失败", str(e))
 
     return success_response(
         {

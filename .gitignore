@@ -31,8 +31,6 @@ frontend/dist/
 .claude/
 *个人开发计划.md
 *负责人任务清单.md
-*个人开发计划.md
-
 .agents/
 .DS_Store
 Thumbs.db
