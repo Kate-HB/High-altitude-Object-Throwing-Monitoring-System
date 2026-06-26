@@ -32,7 +32,7 @@
 → YOLOv11 检测框
 ```
 
-优先级最高的是“上传视频主演示闭环”。摄像头、ONNX、看板属于增强项，但应尽量完成。
+最高优先级：上传视频主演示闭环。
 
 ## 技术栈
 
@@ -72,6 +72,10 @@ logs/                    日志文件，本地生成，不提交 Git
 
 - `详细需求分析.md`
 - `详细开发计划.md`
+- `详细API设计.md`
+- `design.md`
+- `刘康6月24日前端路由与页面布局草案.md`
+- `罗龙飞负责人任务清单.md`
 - `高空抛物监测系统-前期规划.md`
 - `GitHub团队协作指南.md`
 - `docs/architecture.md`
@@ -88,6 +92,7 @@ logs/                    日志文件，本地生成，不提交 Git
 - 视频证据保存：事件截图 + 完整结果视频。
 - 上传视频任务需要真实进度：`processed_frames / total_frames`。
 - ROI 使用前端矩形框：`roi_x / roi_y / roi_width / roi_height`。
+- 上传与 ROI 流程：上传先创建任务，ROI 后通过任务分析接口提交。
 - 摄像头画面传输方式定为 MJPEG 流。
 - 数据库使用 SQLite，不做 MySQL。
 - ONNX Runtime 是应该完成项，但失败不阻塞主演示。
@@ -97,7 +102,7 @@ logs/                    日志文件，本地生成，不提交 Git
 - 主训练机：石义焌 RTX4060 8GB。
 - 备用演示机：陈磊 RTX3050 4GB。
 
-## 已完成
+## 当前已完成
 
 - 已完成项目基础框架。
 - 已完成 FastAPI 健康检查接口。
@@ -106,36 +111,51 @@ logs/                    日志文件，本地生成，不提交 Git
 - 已完成 Windows 前后端启动脚本。
 - 已完成 README、架构文档、开发指南。
 - 已完成 GitHub 团队协作指南。
-- 已完成详细需求分析。
+- 已完成详细需求分析，并补充数据建模、功能建模、模块联系。
 - 已完成详细开发计划。
+- 已完成罗龙飞负责人任务清单。
+- 已完成详细 API 设计。
+- 已完成刘康 6月24日 前端路由与页面布局草案。
+- 已完成 `design.md` 深色科技风前端视觉设计说明。
+- 已生成 Figma 设计稿：
+  - 文件名：高空抛物监测系统-深色科技风设计稿
+  - 链接：https://www.figma.com/design/z3fOmOnu8lSACcD6RfG5k5
+  - 内容：设计说明 + 登录页 + 首页 + 视频分析页 + 报警中心 + 历史事件 + 数据看板 + 参数设置 + 实时监控
 - 已确定核心数据表：
   - `video_tasks`
   - `events`
   - `detection_results`
   - `tracking_results`
   - `system_settings`
-- 已确定核心接口范围：
-  - 登录
-  - 健康检查
-  - 系统状态
-  - 视频上传
-  - 任务查询
-  - 事件查询
-  - 事件状态更新
-  - 文件访问
-  - 统计接口
-  - 参数接口
-  - 摄像头启动、停止、MJPEG 流
+- 已确定核心接口：
+  - `POST /api/auth/login`
+  - `GET /api/health`
+  - `GET /api/system/status`
+  - `POST /api/videos/upload`
+  - `POST /api/tasks/{task_id}/analyze`
+  - `GET /api/tasks/{task_id}`
+  - `GET /api/events`
+  - `GET /api/events/{event_id}`
+  - `PATCH /api/events/{event_id}/status`
+  - `GET /api/statistics/overview`
+  - `GET /api/settings`
+  - `PUT /api/settings`
+  - `GET /api/files`
+  - `POST /api/camera/start`
+  - `POST /api/camera/stop`
+  - `GET /api/camera/status`
+  - `GET /api/camera/stream`
 
 ## 当前问题
 
-当前代码仍主要是项目框架，尚未完整实现业务功能。
+当前代码仍主要是项目框架，业务功能尚未完整实现。
 
 待完成重点：
 
 - SQLite 业务表初始化。
 - 登录接口和 token 校验。
 - 视频上传与后台任务。
+- ROI 提交与分析任务启动。
 - YOLOv11 推理接入。
 - DeepSORT 跟踪接入。
 - 轨迹规则判断。
@@ -150,7 +170,7 @@ logs/                    日志文件，本地生成，不提交 Git
 若时间紧，优先保：
 
 ```text
-上传视频 → 检测 → 跟踪 → 报警 → 入库 → 回放
+上传视频 → ROI → 检测 → 跟踪 → 报警 → 入库 → 回放
 ```
 
 ## 常用命令
@@ -197,6 +217,7 @@ npm run dev
 前端：http://127.0.0.1:5173
 后端健康检查：http://127.0.0.1:8000/api/health
 后端 API 文档：http://127.0.0.1:8000/docs
+Figma：https://www.figma.com/design/z3fOmOnu8lSACcD6RfG5k5
 ```
 
 ### 测试
@@ -256,7 +277,7 @@ chore: 工程配置
 ## Agent 工作规则
 
 - 编码前先读 `CLAUDE.md`。
-- 文档变更优先保持与 `详细需求分析.md`、`详细开发计划.md` 一致。
+- 文档变更优先保持与 `详细需求分析.md`、`详细开发计划.md`、`详细API设计.md` 一致。
 - 代码变更必须小步、可验证。
 - 修改前先确认当前分支和工作区状态。
 - 只做用户要求的任务，不主动扩展范围。

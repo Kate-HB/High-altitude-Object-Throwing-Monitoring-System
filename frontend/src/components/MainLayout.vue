@@ -1,7 +1,6 @@
 <script setup>
-import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, SwitchButton } from '@element-plus/icons-vue'
+import { SwitchButton } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,11 +15,6 @@ const menuItems = [
   { path: '/monitor', label: '实时监控', icon: 'monitor' },
 ]
 
-const pageTitle = computed(() => {
-  const item = menuItems.find((m) => m.path === route.path)
-  return item ? item.label : ''
-})
-
 function logout() {
   localStorage.removeItem('token')
   localStorage.removeItem('token_expire')
@@ -30,25 +24,20 @@ function logout() {
 
 <template>
   <el-container class="main-layout">
-    <!-- 顶部栏 -->
-    <el-header class="top-bar" height="60px">
+    <el-header class="top-bar" height="64px">
       <div class="top-left">
         <span class="system-name">高空抛物监测系统</span>
-        <span class="page-title">{{ pageTitle }}</span>
       </div>
       <div class="top-right">
         <div class="status-group">
           <span class="status-item" :class="{ online: true }">
-            <i class="status-dot"></i>后端在线
+            后端在线
           </span>
           <span class="status-item">
-            <i class="status-dot"></i>算法就绪
-          </span>
-          <span class="status-item">
-            <i class="status-dot"></i>数据库正常
+            GPU Ready
           </span>
         </div>
-        <span class="user-tag">admin</span>
+        <span class="user-tag">用户：admin</span>
         <el-button
           :icon="SwitchButton"
           text
@@ -61,8 +50,7 @@ function logout() {
     </el-header>
 
     <el-container class="body-area">
-      <!-- 侧边栏 -->
-      <el-aside class="side-bar" width="220px">
+      <el-aside class="side-bar" width="228px">
         <el-menu
           :default-active="route.path"
           class="side-menu"
@@ -78,7 +66,6 @@ function logout() {
         </el-menu>
       </el-aside>
 
-      <!-- 主内容区 -->
       <el-main class="main-content">
         <router-view />
       </el-main>
@@ -96,9 +83,8 @@ function logout() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding: 0 28px;
   background: #0b1728;
-  border-bottom: 1px solid #1e3a5f;
 }
 
 .top-left {
@@ -109,13 +95,8 @@ function logout() {
 
 .system-name {
   color: #eaf6ff;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
-}
-
-.page-title {
-  color: #91a8c7;
-  font-size: 14px;
 }
 
 .top-right {
@@ -130,23 +111,22 @@ function logout() {
 }
 
 .status-item {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: #52657f;
+  height: 28px;
+  padding: 0 14px;
+  color: #00d8ff;
   font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #00d8ff;
+  border-radius: 99px;
+  background: rgba(0, 216, 255, 0.13);
 }
 
 .status-item.online {
   color: #00ffb2;
-}
-
-.status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  box-shadow: 0 0 8px currentColor;
+  border-color: #00ffb2;
+  background: rgba(0, 255, 178, 0.13);
 }
 
 .user-tag {
@@ -159,7 +139,7 @@ function logout() {
 }
 
 .body-area {
-  height: calc(100vh - 60px);
+  height: calc(100vh - 64px);
 }
 
 .side-bar {
@@ -176,7 +156,8 @@ function logout() {
 .side-menu :deep(.el-menu-item) {
   color: #91a8c7;
   font-size: 14px;
-  margin: 4px 8px;
+  height: 40px;
+  margin: 14px 18px;
   border-radius: 8px;
 }
 
@@ -187,12 +168,12 @@ function logout() {
 
 .side-menu :deep(.el-menu-item.is-active) {
   background: rgba(0, 216, 255, 0.14);
-  color: #eaf6ff;
-  border-left: 3px solid #00d8ff;
+  color: #00d8ff;
+  border: 1px solid #00d8ff;
 }
 
 .main-content {
-  padding: 20px;
+  padding: 36px 32px;
   background: #07111f;
   overflow-y: auto;
 }
