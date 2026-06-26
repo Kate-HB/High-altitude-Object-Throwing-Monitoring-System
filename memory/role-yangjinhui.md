@@ -3,8 +3,8 @@
 ## 基本信息
 - 角色：测试与联调负责人
 - 分支：`feature/yangjinhui`
-- 工作目录：`tests/`
-- 测试记录：`tests/test-records/`
+- 工作目录：`tests/integration/`
+- 测试记录：`tests/integration/test-records/`
 
 ## 已完成
 

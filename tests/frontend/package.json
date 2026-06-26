@@ -1,0 +1,28 @@
+{
+  "name": "high-altitude-object-throwing-monitoring-system",
+  "version": "1.0.0",
+  "description": "面向生产实习答辩的 Web 监测平台。目标是完成“视频输入、目标检测与跟踪、行为判定、实时报警、事件存储与回放”的演示闭环。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kate-HB/High-altitude-Object-Throwing-Monitoring-System.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Kate-HB/High-altitude-Object-Throwing-Monitoring-System/issues"
+  },
+  "homepage": "https://github.com/Kate-HB/High-altitude-Object-Throwing-Monitoring-System#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  }
+}

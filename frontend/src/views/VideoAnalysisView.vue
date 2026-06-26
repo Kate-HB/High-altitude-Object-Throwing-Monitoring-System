@@ -1,7 +1,9 @@
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { uploadVideo, analyzeTask, fetchTask } from '../api/videos'
+import { fetchFile } from '../api/files'
+import { normalizeTaskProgress } from '../utils/dashboard'
 
 // ── Step state ──
 const step = ref('upload') // upload | configure | running | done
@@ -35,9 +37,9 @@ async function doUpload() {
     const res = await uploadVideo(fd, (p) => { uploadProgress.value = p })
     taskId.value = res.data.task_id
     totalFrames.value = res.data.total_frames
-    // Build object URL for video preview
     videoUrl.value = URL.createObjectURL(selectedFile.value)
     step.value = 'configure'
+    await nextTick()
     ElMessage.success('上传成功')
   } catch (e) {
     ElMessage.error(e.message || '上传失败')
@@ -52,6 +54,7 @@ const totalFrames = ref(0)
 const videoUrl = ref(null)
 const videoRef = ref(null)
 const canvasRef = ref(null)
+const resultVideoUrl = ref(null)
 
 // ── ROI drawing ──
 const roi = ref({ x: 0, y: 0, width: null, height: null })
@@ -65,6 +68,16 @@ function onVideoLoad() {
   if (!v) return
   canvasWidth.value = v.videoWidth || 640
   canvasHeight.value = v.videoHeight || 360
+  if (v.readyState >= 2) {
+    try {
+      v.currentTime = 0
+    } catch {
+      drawVideoFrame()
+    }
+  }
+}
+
+function onVideoSeeked() {
   drawVideoFrame()
 }
 
@@ -123,6 +136,8 @@ const progress = ref(0)
 const taskStatus = ref('')
 const taskError = ref('')
 const events = ref([])
+const processedFrames = ref(0)
+const resultVideoPath = ref('')
 let pollTimer = null
 
 async function doAnalyze() {
@@ -153,15 +168,18 @@ function startPolling() {
     try {
       const res = await fetchTask(taskId.value)
       const t = res.data
-      progress.value = t.progress || 0
+      progress.value = normalizeTaskProgress(t)
       taskStatus.value = t.status
       events.value = t.events || []
+      processedFrames.value = t.processed_frames || 0
+      resultVideoPath.value = t.result_video_path || ''
       if (t.status === 'success' || t.status === 'failed') {
         clearInterval(pollTimer)
         pollTimer = null
         step.value = 'done'
         taskError.value = t.error_message || ''
         if (t.status === 'success') {
+          await loadResultVideo(t.result_video_path)
           ElMessage.success('分析完成')
         } else {
           ElMessage.error(t.error_message || '分析失败')
@@ -173,9 +191,21 @@ function startPolling() {
   }, 1500)
 }
 
+async function loadResultVideo(path) {
+  if (!path) return
+  try {
+    const res = await fetchFile(path)
+    if (resultVideoUrl.value) URL.revokeObjectURL(resultVideoUrl.value)
+    resultVideoUrl.value = URL.createObjectURL(res.data)
+  } catch {
+    resultVideoUrl.value = null
+  }
+}
+
 onBeforeUnmount(() => {
   if (pollTimer) clearInterval(pollTimer)
   if (videoUrl.value) URL.revokeObjectURL(videoUrl.value)
+  if (resultVideoUrl.value) URL.revokeObjectURL(resultVideoUrl.value)
 })
 
 // ── Status text ──
@@ -200,8 +230,11 @@ function reset() {
   taskStatus.value = ''
   taskError.value = ''
   events.value = []
+  processedFrames.value = 0
+  resultVideoPath.value = ''
   uploadProgress.value = 0
   if (videoUrl.value) { URL.revokeObjectURL(videoUrl.value); videoUrl.value = null }
+  if (resultVideoUrl.value) { URL.revokeObjectURL(resultVideoUrl.value); resultVideoUrl.value = null }
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
 }
 </script>
@@ -210,9 +243,11 @@ function reset() {
   <div class="analysis-page">
     <h2 class="page-heading">视频分析</h2>
 
-    <!-- Step 1: Upload -->
-    <section v-if="step === 'upload'" class="upload-section">
-      <div class="upload-card" @click="fileInput?.click()">
+    <section class="analysis-grid">
+      <div class="left-column">
+        <div class="panel upload-panel">
+          <h3 class="panel-title">上传视频</h3>
+          <div class="upload-box" @click="fileInput?.click()">
         <input
           ref="fileInput"
           type="file"
@@ -220,41 +255,47 @@ function reset() {
           style="display:none"
           @change="onFileChange"
         />
-        <template v-if="!selectedFile">
-          <el-icon :size="48" color="#52657f"><i class="el-icon-upload" /></el-icon>
-          <p class="upload-hint">点击选择视频文件</p>
-          <p class="upload-formats">支持 .mp4 .avi .mov .mkv</p>
-        </template>
-        <template v-else>
-          <p class="file-name">{{ selectedFile.name }}</p>
-          <p class="file-size">{{ (selectedFile.size / 1024 / 1024).toFixed(1) }} MB</p>
-        </template>
-      </div>
-      <div class="upload-actions" v-if="selectedFile">
-        <el-button
-          type="primary"
-          size="large"
-          :loading="uploadLoading"
-          @click="doUpload"
-        >
-          {{ uploadLoading ? `上传中 ${uploadProgress}%` : '上传视频' }}
-        </el-button>
-        <el-button size="large" @click="reset">取消</el-button>
-      </div>
-    </section>
+            <template v-if="!selectedFile">
+              <p class="upload-hint">拖拽或选择 MP4/AVI</p>
+            </template>
+            <template v-else>
+              <p class="file-name">{{ selectedFile.name }}</p>
+              <p class="file-size">{{ (selectedFile.size / 1024 / 1024).toFixed(1) }} MB</p>
+            </template>
+          </div>
+          <div class="button-row">
+            <el-button
+              type="primary"
+              :loading="uploadLoading"
+              :disabled="!selectedFile || step !== 'upload'"
+              @click.stop="doUpload"
+            >
+              {{ uploadLoading ? `上传中 ${uploadProgress}%` : '选择视频' }}
+            </el-button>
+            <el-button v-if="selectedFile" @click="reset">重置</el-button>
+          </div>
+        </div>
 
-    <!-- Step 2: Configure ROI -->
-    <section v-if="step === 'configure'" class="configure-section">
-      <div class="preview-panel">
-        <h3 class="section-title">视频预览 — 拖动鼠标绘制ROI区域</h3>
-        <div class="video-wrapper">
+        <div class="panel params-panel">
+          <h3 class="panel-title">快速参数</h3>
+          <p class="param-text">detect_confidence = 0.35</p>
+          <div class="slider-track">
+            <i></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="center-column">
+        <div class="video-panel roi-panel">
           <video
             ref="videoRef"
             :src="videoUrl"
-            style="display:none"
+            class="hidden-video"
             @loadeddata="onVideoLoad"
+            @seeked="onVideoSeeked"
           />
           <canvas
+            v-show="videoUrl"
             ref="canvasRef"
             :width="canvasWidth"
             :height="canvasHeight"
@@ -264,249 +305,280 @@ function reset() {
             @mouseup="onMouseUp"
             @mouseleave="onMouseUp"
           />
+          <div v-if="!videoUrl" class="video-placeholder">
+            <i></i>
+            <span>首帧 ROI 选择</span>
+          </div>
+          <div v-if="roi.width" class="roi-readout">
+            ROI: ({{ roi.x }}, {{ roi.y }}) {{ roi.width }}×{{ roi.height }}
+          </div>
         </div>
-        <div class="roi-info">
-          <span v-if="roi.width">ROI: ({{ roi.x }}, {{ roi.y }}) {{ roi.width }}×{{ roi.height }}</span>
-          <span v-else class="roi-hint">请在画面上拖动鼠标绘制ROI矩形区域</span>
+
+        <div class="video-panel result-panel">
+          <video
+            v-if="resultVideoUrl"
+            :src="resultVideoUrl"
+            class="result-video"
+            controls
+          />
+          <div v-else class="video-placeholder compact">
+            <i></i>
+            <span>结果视频回放</span>
+          </div>
         </div>
       </div>
-      <div class="configure-actions">
+
+      <aside class="task-panel">
+        <h3 class="panel-title">任务进度</h3>
+        <p class="task-muted">processed / total</p>
+        <div class="progress-track">
+          <i :style="{ width: `${progress}%` }"></i>
+        </div>
+        <span class="task-status" :style="{ color: statusColor, borderColor: statusColor }">
+          {{ statusText || '等待上传' }}
+        </span>
+        <div class="task-summary">
+          <p>任务：{{ taskId ? `#${taskId}` : '--' }}</p>
+          <p>帧数：{{ processedFrames }} / {{ totalFrames || '--' }}</p>
+          <p>疑似事件：{{ events.length }}</p>
+          <p>最高置信度：{{ events[0]?.confidence ?? '--' }}</p>
+          <p>状态：{{ taskStatus || '--' }}</p>
+        </div>
         <el-button
           type="primary"
-          size="large"
+          class="analyze-btn"
           :loading="analyzing"
-          :disabled="!roi.width"
+          :disabled="step !== 'configure' || !roi.width"
           @click="doAnalyze"
         >
           开始分析
         </el-button>
-        <el-button size="large" @click="reset">重新上传</el-button>
-      </div>
-    </section>
-
-    <!-- Step 3-4: Running / Done -->
-    <section v-if="step === 'running' || step === 'done'" class="result-section">
-      <div class="result-card">
-        <h3 class="section-title">分析进度</h3>
-        <div class="status-row">
-          <span class="status-badge" :style="{ color: statusColor }">{{ statusText }}</span>
-          <span class="frame-info">任务 #{{ taskId }} | {{ totalFrames }} 帧</span>
-        </div>
-        <el-progress
-          :percentage="progress"
-          :status="taskStatus === 'failed' ? 'exception' : taskStatus === 'success' ? 'success' : undefined"
-          :stroke-width="16"
-          class="progress-bar"
-        />
         <p v-if="taskStatus === 'failed'" class="error-msg">{{ taskError }}</p>
-
-        <!-- Events -->
-        <div v-if="events.length" class="events-panel">
-          <h4>检测事件 ({{ events.length }})</h4>
-          <div v-for="evt in events" :key="evt.id" class="event-row">
-            <span>Track #{{ evt.track_id }}</span>
-            <span>置信度 {{ evt.confidence?.toFixed(2) }}</span>
-            <el-tag size="small" :type="evt.status === 'confirmed' ? 'success' : 'info'">
-              {{ evt.status === 'unconfirmed' ? '待确认' : evt.status === 'confirmed' ? '已确认' : '误报' }}
-            </el-tag>
-          </div>
-        </div>
-      </div>
-      <div class="result-actions">
-        <el-button type="primary" size="large" @click="reset">分析新视频</el-button>
-      </div>
+        <el-button v-if="step === 'done'" class="new-btn" @click="reset">分析新视频</el-button>
+      </aside>
     </section>
   </div>
 </template>
 
 <style scoped>
 .analysis-page {
-  max-width: 960px;
-  margin: 0 auto;
+  max-width: 1080px;
 }
 
 .page-heading {
-  margin: 0 0 20px;
+  margin: 4px 0 24px;
   color: #eaf6ff;
-  font-size: 20px;
-  font-weight: 600;
+  font-size: 30px;
+  font-weight: 700;
 }
 
-/* ── Upload ── */
-.upload-section {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
+.analysis-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr 180px;
+  gap: 32px;
+  align-items: start;
 }
 
-.upload-card {
-  width: 100%;
-  max-width: 500px;
-  padding: 60px 40px;
+.left-column,
+.center-column {
+  display: grid;
+  gap: 24px;
+}
+
+.panel,
+.task-panel {
   background: #101f33;
-  border: 2px dashed #1e3a5f;
-  border-radius: 12px;
+  border: 1px solid #1e3a5f;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+
+.upload-panel {
+  height: 230px;
+  padding: 24px;
+}
+
+.params-panel {
+  height: 164px;
+  padding: 24px;
+}
+
+.panel-title {
+  color: #eaf6ff;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 18px;
+}
+
+.upload-box {
+  height: 66px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+  background: #0d1a2b;
+  border: 1px solid #1e3a5f;
+  border-radius: 8px;
   cursor: pointer;
-  text-align: center;
-  transition: border-color 0.2s;
 }
 
-.upload-card:hover {
-  border-color: #00d8ff;
-}
-
-.upload-hint {
-  margin: 12px 0 4px;
+.upload-hint,
+.file-size,
+.task-muted,
+.param-text {
   color: #91a8c7;
-  font-size: 15px;
-}
-
-.upload-formats {
-  color: #52657f;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .file-name {
+  max-width: 230px;
   color: #eaf6ff;
-  font-size: 16px;
-  margin-bottom: 4px;
-  word-break: break-all;
-}
-
-.file-size {
-  color: #91a8c7;
   font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.upload-actions {
+.button-row {
   display: flex;
-  gap: 12px;
+  gap: 10px;
 }
 
-/* ── Configure ── */
-.configure-section {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+.slider-track,
+.progress-track {
+  height: 8px;
+  margin-top: 18px;
+  background: #1e3a5f;
+  border-radius: 99px;
+  overflow: hidden;
 }
 
-.preview-panel {
-  background: #101f33;
-  border: 1px solid #1e3a5f;
-  border-radius: 10px;
-  padding: 20px;
+.slider-track i {
+  display: block;
+  width: 45%;
+  height: 100%;
+  background: #00d8ff;
 }
 
-.section-title {
-  margin: 0 0 12px;
-  padding-left: 12px;
-  border-left: 3px solid #00d8ff;
-  color: #eaf6ff;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.video-wrapper {
+.video-panel {
   position: relative;
-  background: #000;
+  background: #050b14;
+  border: 1px solid #1e3a5f;
   border-radius: 8px;
   overflow: hidden;
+}
+
+.hidden-video {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.roi-panel {
+  height: 330px;
+}
+
+.result-panel {
+  height: 250px;
 }
 
 .roi-canvas {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: contain;
   cursor: crosshair;
 }
 
-.roi-info {
-  margin-top: 10px;
+.video-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
   color: #91a8c7;
-  font-size: 13px;
+  font-size: 16px;
 }
 
-.roi-hint {
-  color: #52657f;
+.video-placeholder i {
+  width: 136px;
+  height: 56px;
+  margin-bottom: 58px;
+  border-radius: 50%;
+  background: rgba(0, 216, 255, 0.18);
+  filter: blur(1px);
 }
 
-.configure-actions {
-  display: flex;
-  gap: 12px;
+.video-placeholder span {
+  position: absolute;
 }
 
-/* ── Result ── */
-.result-section {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+.video-placeholder.compact i {
+  height: 45px;
+  margin-bottom: 42px;
 }
 
-.result-card {
-  background: #101f33;
+.roi-readout {
+  position: absolute;
+  left: 16px;
+  bottom: 14px;
+  padding: 5px 10px;
+  color: #00d8ff;
+  background: rgba(7, 17, 31, 0.82);
   border: 1px solid #1e3a5f;
-  border-radius: 10px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.result-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.task-panel {
+  min-height: 614px;
   padding: 24px;
 }
 
-.status-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
+.progress-track i {
+  display: block;
+  height: 100%;
+  background: #00d8ff;
+  transition: width 0.2s ease;
 }
 
-.status-badge {
-  font-size: 18px;
+.task-status {
+  display: inline-flex;
+  margin: 20px 0 28px;
+  padding: 6px 14px;
+  border: 1px solid #00d8ff;
+  border-radius: 99px;
+  font-size: 12px;
   font-weight: 700;
 }
 
-.frame-info {
-  color: #52657f;
-  font-size: 13px;
+.task-summary {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 26px;
+  color: #eaf6ff;
+  font-size: 14px;
 }
 
-.progress-bar {
-  margin-bottom: 16px;
+.analyze-btn,
+.new-btn {
+  width: 100%;
 }
 
-.progress-bar :deep(.el-progress-bar__outer) {
-  background: #1e3a5f;
+.new-btn {
+  margin-top: 10px;
 }
 
 .error-msg {
   color: #ff4d4f;
-  font-size: 14px;
-  margin-top: 8px;
-}
-
-.events-panel {
-  margin-top: 20px;
-  border-top: 1px solid #1e3a5f;
-  padding-top: 16px;
-}
-
-.events-panel h4 {
-  color: #91a8c7;
-  font-size: 14px;
-  margin: 0 0 12px;
-}
-
-.event-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 8px 12px;
-  background: #0b1728;
-  border-radius: 6px;
-  margin-bottom: 8px;
-  color: #91a8c7;
   font-size: 13px;
-}
-
-.result-actions {
-  display: flex;
-  justify-content: center;
+  margin-top: 12px;
 }
 </style>

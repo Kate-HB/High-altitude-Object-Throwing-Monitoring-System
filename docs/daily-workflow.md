@@ -9,16 +9,18 @@
 ## 2. 执行顺序
 
 ```
-陈磊 → 刘康 → 杨锦辉 → 罗龙飞
+陈磊 → [用户确认] → 刘康 → [用户确认] → 杨锦辉 → [用户确认] → 罗龙飞
 ```
 
 **为什么这个顺序？** 陈磊后端先出接口 → 刘康前端对接 → 杨锦辉测试验证 → 罗龙飞收尾审核。
+
+**为什么每个角色后要确认？** 每人的PR需要用户在GitHub上手动审核。确认后AI才能继续下一个角色，避免未经审核的代码堆叠。
 
 石义焌（算法）暂不纳入此流程。
 
 ## 3. 每个角色的执行模板
 
-对每个角色，严格按以下6步执行：
+对每个角色，严格按以下7步执行：
 
 ### 步骤1：加载上下文
 - 读取 `memory/role-{姓名}.md`（角色卡）
@@ -31,26 +33,33 @@
 - 产出对应"当日交付"列的文件
 - 以"验收标准"列为完成判定
 
-### 步骤3：编写工作日志
+### 步骤3：代码审查
+- 对当次变更执行 `/code-review`
+- 根据审查意见修改后继续
+
+### 步骤4：编写工作日志
 - 文件路径：`docs/logs/YYYY-MM-DD-{姓名}.md`
 - 模板：今日任务 → 完成结果 → 遇到的问题 → 解决办法 → 明日计划 → 相关截图或代码提交
 - 重点写问题和解决办法，不写流水账
 
-### 步骤4：更新角色记忆
+### 步骤5：更新角色记忆
 - 更新 `memory/role-{姓名}.md`
 - 补充当日完成项和进度
 - 更新"明日计划"为开发计划中明天的任务
 
-### 步骤5：提交代码
+### 步骤6：提交代码并创建PR
 - `git add` 该角色产出的所有文件
 - commit 格式：`类型: 描述`（如 `feat:` `test:` `docs:` `fix:`）
 - `git push origin {分支名}`
-
-### 步骤6：创建PR
 - base: `dev`，head: 该角色分支
 - 标题格式：`类型: {姓名} X/X 任务描述`
 - body：变更文件列表 + 简要说明
 - 使用 `gh pr create`
+
+### 步骤7：停止等待用户确认 ⚠️
+- PR创建后**立即停止**，告知用户PR号和链接
+- 等待用户说"继续"或"可以了"才能进入下一个角色
+- 未经用户确认**不得**开始下一个角色的任何工作
 
 ## 4. 角色执行详情
 
@@ -61,13 +70,14 @@
 | 分支 | `feature/chenlei` |
 | commit类型 | `feat:` / `fix:` |
 | 工作目录 | `backend/` |
-| 测试 | `tests/backend/` |
+| 自动化测试 | `tests/backend/` (pytest) |
 
 典型任务：
 - 实现FastAPI接口
 - SQLite表操作
 - 后台线程
 - 文件存储
+- services层业务逻辑
 
 ### 4.2 刘康（前端）
 
@@ -77,7 +87,7 @@
 | commit类型 | `feat:` / `style:` |
 | 工作目录 | `frontend/` |
 | 设计参考 | **必读** `design.md`，页面布局严格按第7节 |
-| 测试 | 无独立测试目录（手动验证） |
+| 自动化测试 | `tests/frontend/` (Playwright) |
 
 **⚠️ 前端开发强制前置步骤：**
 1. **先读 `design.md`** — 找到对应页面的布局规定（第7节），确认每个区域的位置
@@ -91,6 +101,7 @@
 - Element Plus UI
 - ECharts图表
 - 接口对接
+- Playwright E2E测试编写
 
 ### 4.3 杨锦辉（测试）
 
@@ -99,16 +110,25 @@
 | 分支 | `feature/yangjinhui` |
 | commit类型 | `test:` / `docs:` |
 | 工作目录 | `tests/` |
-| 测试记录 | `tests/test-records/` |
-| 问题清单 | `tests/issues/` |
+| 自动化测试 | `tests/backend/` (pytest), `tests/frontend/` (Playwright) |
+| 集成测试 | `tests/integration/` (手动+curl+DB验证) |
+| 测试记录 | `tests/integration/test-records/` |
+| 问题清单 | `tests/integration/issues/` |
+| 测试用例 | `tests/integration/test-cases/` |
 
 典型任务：
-- 手动curl测试
-- pytest验证
+- pytest后端测试编写与执行
+- Playwright前端E2E测试编写与执行
+- 手动curl接口测试
 - 数据库验证
-- 测试用例编写
+- 集成测试用例编写
 - 测试记录产出
 - 问题清单更新
+
+**杨锦辉的测试三层结构：**
+1. `tests/backend/` — pytest自动化，接口+数据库+鉴权
+2. `tests/frontend/` — Playwright E2E，页面渲染+交互+Mock API
+3. `tests/integration/` — 手动测试记录、用例表、问题清单、截图
 
 ### 4.4 罗龙飞（负责人）
 
@@ -127,6 +147,7 @@
 - 算法接口协调：`docs/algorithm-interface.md`
 - 收集PPT素材
 - 编写个人日志
+- 审核前三个角色的PR
 
 **罗龙飞的特殊性：**
 - 不写业务代码
@@ -151,19 +172,21 @@
 **陈磊（后端）：**
 - 调用 `run_video_analysis()` 占位函数，返回 `status="not_ready"`
 - 后台线程框架仍然完整：创建任务 → pending → running → 调用算法 → 收到结果 → 更新状态
-- 算法未就绪时，任务状态停留在 `running`，或收到 `not_ready` 后设为 `failed`
+- 算法未就绪时，收到 `not_ready` 后设为 `failed`
 - 后端接口、数据库、文件存储不受影响，可以独立开发和测试
 
 **刘康（前端）：**
 - 上传、ROI绘制、进度条、结果区域照常开发
-- 算法未就绪时显示"算法模块未加载"或等待状态
-- 前端用mock数据验证页面交互，不依赖真实检测结果
+- 算法未就绪时显示"Detection model is not loaded"
+- 前端用Mock数据验证页面交互，不依赖真实检测结果
+- Playwright测试通过 `page.route()` Mock所有API，不依赖后端和算法
 
 **杨锦辉（测试）：**
 - 上传→任务创建→状态查询 链路可完整测试
 - 异常路径可测试：算法不可用时的后端行为、前端展示
 - 数据库验证不依赖算法：表结构、默认参数、任务记录可独立验证
 - 事件入库、报警、回放的测试需要等石义焌产出后才能执行
+- Playwright前端测试可独立运行，Mock全部API
 
 **罗龙飞（协调）：**
 - 接口合同已冻结（`docs/algorithm-interface.md`），算法按合同接入即可
@@ -174,7 +197,7 @@
 ```
 登录 → 上传视频 → 绘制ROI → 创建任务 → 调用算法占位 → 状态变化 → 前端展示进度
                                               ↓
-                                   返回 not_ready 或 success(mock)
+                                   返回 not_ready → failed
 ```
 
 真正需要算法的地方（检测框、track_id、轨迹、事件、结果视频）在6/28石义焌交付后接入，函数签名不变，后端和前端代码无需改动。
@@ -203,16 +226,22 @@
 - 每人是否提交代码
 - 每人是否写个人日志
 - 每人是否提PR
+- 所有PR是否通过审核
 - 是否有不能运行的代码合入dev
 - 明天最优先解决什么
 
 ## 9. 文件结构约定
 
 ```
-docs/logs/YYYY-MM-DD-{姓名}.md           # 个人日志
-memory/role-{姓名}.md                     # 角色记忆
-tests/test-records/YYYY-MM-DD-{描述}.md   # 测试记录
-tests/issues/集成问题清单.md               # 问题跟踪
+docs/logs/YYYY-MM-DD-{姓名}.md                              # 个人日志
+memory/role-{姓名}.md                                        # 角色记忆
+tests/backend/                                               # pytest后端测试
+tests/frontend/                                              # Playwright E2E测试
+tests/integration/test-records/YYYY-MM-DD-{描述}.md          # 手动测试记录
+tests/integration/test-cases/                                # 测试用例表
+tests/integration/issues/集成问题清单.md                      # 问题跟踪
+tests/integration/reports/                                   # 测试报告
+tests/integration/screenshots/                               # 测试截图
 ```
 
 ## 10. 每日执行检查清单
@@ -223,7 +252,10 @@ tests/issues/集成问题清单.md               # 问题跟踪
 - [ ] 刘康：代码 + 日志 + 记忆 + commit + push + PR
 - [ ] 杨锦辉：测试记录 + 日志 + 记忆 + commit + push + PR
 - [ ] 罗龙飞：复核记录 + 日志 + 记忆 + commit + push + PR
-- [ ] 4个PR全部创建，base均为dev
+- [ ] 4个PR全部创建且通过审核，base均为dev
+- [ ] pytest全部通过（`python -m pytest -v`）
+- [ ] 前端构建成功（`npm run build`）
+- [ ] Playwright全部通过（`npx playwright test`）
 - [ ] dev分支能正常运行
 - [ ] 所有人的日志、记忆已更新到当天日期
 
