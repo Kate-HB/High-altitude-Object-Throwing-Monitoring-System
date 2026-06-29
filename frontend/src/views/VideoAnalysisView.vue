@@ -474,8 +474,6 @@ function reset() {
 
 <template>
   <div class="analysis-page" @keydown="onKeyDown" tabindex="0">
-    <h2 class="page-heading">视频分析</h2>
-
     <section class="analysis-grid">
       <div class="left-column">
         <div class="panel upload-panel">

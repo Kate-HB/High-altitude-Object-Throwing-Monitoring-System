@@ -67,8 +67,6 @@ onMounted(async () => {
 
 <template>
   <div class="home-page">
-    <h2 class="page-heading">系统首页</h2>
-
     <section class="stat-row">
       <div v-for="card in statCards" :key="card.label" class="stat-card">
         <span class="stat-label">{{ card.label }}</span>

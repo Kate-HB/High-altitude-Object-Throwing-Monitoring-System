@@ -1,344 +1,237 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { Search, VideoPlay, Refresh } from '@element-plus/icons-vue'
+import { computed, onMounted, ref } from 'vue'
 import { fetchEvents } from '../api/events'
-import { fetchFile } from '../api/files'
 
-// ── State ──
-const events = ref([])
-const loading = ref(false)
-const total = ref(0)
-const page = ref(1)
-const pageSize = ref(20)
-const selectedEvent = ref(null)
-const snapshotUrl = ref('')
-const videoUrl = ref('')
-const mediaLoading = ref(false)
-
-const filters = ref({
-  status: '',
-  min_confidence: '',
-  task_id: '',
-})
-
-// ── Computed ──
-const statusOptions = [
-  { label: '全部状态', value: '' },
-  { label: '待确认', value: 'unconfirmed' },
-  { label: '已确认', value: 'confirmed' },
-  { label: '误报', value: 'false_alarm' },
+const demoEvents = [
+  { id: 1, created_at: '06-25 20:10', type: '疑似抛物事件', confidence: 0.82, status: 'unconfirmed', track_id: 12 },
+  { id: 2, created_at: '06-25 20:11', type: '疑似抛物事件', confidence: 0.78, status: 'unconfirmed', track_id: 13 },
+  { id: 3, created_at: '06-25 20:12', type: '疑似抛物事件', confidence: 0.74, status: 'unconfirmed', track_id: 14 },
+  { id: 4, created_at: '06-25 20:13', type: '疑似抛物事件', confidence: 0.70, status: 'unconfirmed', track_id: 15 },
+  { id: 5, created_at: '06-25 20:14', type: '疑似抛物事件', confidence: 0.66, status: 'unconfirmed', track_id: 16 },
+  { id: 6, created_at: '06-25 20:15', type: '疑似抛物事件', confidence: 0.62, status: 'unconfirmed', track_id: 17 },
+  { id: 7, created_at: '06-25 20:16', type: '疑似抛物事件', confidence: 0.58, status: 'unconfirmed', track_id: 18 },
+  { id: 8, created_at: '06-25 20:17', type: '疑似抛物事件', confidence: 0.54, status: 'unconfirmed', track_id: 19 },
 ]
 
-const statusTagType = (s) => {
-  const map = { unconfirmed: 'warning', confirmed: 'success', false_alarm: 'info' }
-  return map[s] || 'info'
+const events = ref(demoEvents)
+const selectedEvent = ref(demoEvents[0])
+const loading = ref(false)
+const filters = ref({ status: '', start: '', end: '', confidence: '' })
+
+const trackInfo = computed(() => ({
+  track_id: selectedEvent.value?.track_id ?? 12,
+  start_frame: 118,
+  end_frame: 166,
+  timestamp: '00:04.72',
+}))
+
+function selectEvent(event) {
+  selectedEvent.value = event
 }
 
-const statusLabel = (s) => {
-  const map = { unconfirmed: '待确认', confirmed: '已确认', false_alarm: '误报' }
-  return map[s] || s
-}
-
-const confidenceColor = (val) => {
-  if (val >= 0.7) return '#ff4d4f'
-  if (val >= 0.5) return '#ffb020'
-  return '#00d8ff'
-}
-
-// ── Methods ──
 async function loadEvents() {
   loading.value = true
   try {
-    const params = {
-      limit: pageSize.value,
-      offset: (page.value - 1) * pageSize.value,
-    }
-    if (filters.value.status) params.status = filters.value.status
-    if (filters.value.task_id) params.task_id = Number(filters.value.task_id)
-
-    const res = await fetchEvents(params)
+    const res = await fetchEvents({ limit: 50 })
     const list = res.data?.events || []
-    events.value = list
-
-    // Client-side confidence filter
-    if (filters.value.min_confidence) {
-      const min = parseFloat(filters.value.min_confidence)
-      if (!isNaN(min)) {
-        events.value = events.value.filter(e => (e.confidence || 0) >= min)
-      }
+    if (list.length) {
+      events.value = list.map(item => ({
+        ...item,
+        type: '疑似抛物事件',
+        created_at: item.created_at || '--',
+      }))
+      selectedEvent.value = events.value[0]
     }
-
-    total.value = res.data?.count ?? events.value.length
   } catch {
-    events.value = []
+    events.value = demoEvents
+    selectedEvent.value = demoEvents[0]
   } finally {
     loading.value = false
   }
 }
 
-function handleFilter() {
-  page.value = 1
-  loadEvents()
-}
-
-async function selectEvent(event) {
-  selectedEvent.value = event
-  mediaLoading.value = true
-
-  // Revoke previous blob URLs before creating new ones
-  if (snapshotUrl.value) { URL.revokeObjectURL(snapshotUrl.value); snapshotUrl.value = '' }
-  if (videoUrl.value) { URL.revokeObjectURL(videoUrl.value); videoUrl.value = '' }
-
-  try {
-    if (event.snapshot_path) {
-      const res = await fetchFile(event.snapshot_path)
-      snapshotUrl.value = URL.createObjectURL(res.data)
-    }
-  } catch { /* no snapshot */ }
-
-  try {
-    if (event.result_video_path) {
-      const res = await fetchFile(event.result_video_path)
-      videoUrl.value = URL.createObjectURL(res.data)
-    }
-  } catch { /* no video */ }
-
-  mediaLoading.value = false
-}
-
-// ── Lifecycle ──
 onMounted(loadEvents)
-
-onUnmounted(() => {
-  if (snapshotUrl.value) URL.revokeObjectURL(snapshotUrl.value)
-  if (videoUrl.value) URL.revokeObjectURL(videoUrl.value)
-})
-
-defineOptions({ name: 'HistoryView' })
 </script>
 
 <template>
   <div class="history-page">
-    <h2 class="page-heading">历史事件</h2>
+    <section class="filter-card">
+      <input v-model="filters.status" placeholder="状态" />
+      <input v-model="filters.start" placeholder="开始时间" />
+      <input v-model="filters.end" placeholder="结束时间" />
+      <input v-model="filters.confidence" placeholder="最低置信度" />
+      <button @click="loadEvents">查询</button>
+    </section>
 
-    <!-- Filter bar -->
-    <div class="filter-card">
-      <div class="filter-row">
-        <div class="filter-item">
-          <label>状态</label>
-          <el-select v-model="filters.status" size="small" style="width:130px">
-            <el-option v-for="o in statusOptions" :key="o.value" :label="o.label" :value="o.value" />
-          </el-select>
+    <section class="history-grid">
+      <div class="event-table" v-loading="loading">
+        <div class="table-head">
+          <span>时间</span>
+          <span>类型</span>
+          <span>置信度</span>
+          <span>状态</span>
         </div>
-        <div class="filter-item">
-          <label>最低置信度</label>
-          <el-input-number v-model="filters.min_confidence" :min="0" :max="1" :step="0.05" :precision="2" size="small" style="width:140px" placeholder="0.00" />
-        </div>
-        <div class="filter-item">
-          <label>任务ID</label>
-          <el-input v-model="filters.task_id" size="small" style="width:120px" placeholder="可选" clearable />
-        </div>
-        <el-button type="primary" size="small" :icon="Search" @click="handleFilter">筛选</el-button>
-        <el-button size="small" :icon="Refresh" @click="loadEvents">刷新</el-button>
+        <button
+          v-for="event in events"
+          :key="event.id"
+          class="table-row"
+          :class="{ active: selectedEvent?.id === event.id }"
+          @click="selectEvent(event)"
+        >
+          <span>{{ event.created_at }}</span>
+          <span>{{ event.type }}</span>
+          <span>{{ Number(event.confidence || 0).toFixed(2) }}</span>
+          <span>{{ event.status === 'unconfirmed' ? '未确认' : event.status }}</span>
+        </button>
       </div>
-    </div>
 
-    <!-- Events table -->
-    <div class="table-card">
-      <el-table
-        :data="events"
-        v-loading="loading"
-        highlight-current-row
-        @row-click="selectEvent"
-        class="events-table"
-        size="small"
-        empty-text="暂无匹配事件"
-      >
-        <el-table-column prop="id" label="ID" width="60" />
-        <el-table-column prop="video_task_id" label="任务ID" width="70" />
-        <el-table-column prop="created_at" label="时间" width="170" />
-        <el-table-column prop="track_id" label="跟踪ID" width="80" />
-        <el-table-column label="置信度" width="110">
-          <template #default="{ row }">
-            <span :style="{ color: confidenceColor(row.confidence) }" class="conf-cell">
-              {{ row.confidence ? (row.confidence * 100).toFixed(1) + '%' : '--' }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="statusTagType(row.status)" size="small" effect="dark">{{ statusLabel(row.status) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="截图" width="120">
-          <template #default="{ row }">
-            <span :style="{ color: row.snapshot_path ? '#00d8ff' : '#52657f', fontSize: '12px' }">
-              {{ row.snapshot_path ? '有截图' : '无截图' }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="视频" width="140">
-          <template #default="{ row }">
-            <span :style="{ color: row.result_video_path ? '#00d8ff' : '#52657f', fontSize: '12px' }">
-              {{ row.result_video_path ? '有结果视频' : '视频生成中' }}
-            </span>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div class="pagination-wrap">
-        <el-pagination
-          v-model:current-page="page"
-          :page-size="pageSize"
-          :total="total"
-          layout="prev, pager, next"
-          background
-          small
-          @current-change="loadEvents"
-        />
-      </div>
-    </div>
-
-    <!-- Media panel -->
-    <div v-if="selectedEvent" class="media-card">
-      <h3 class="section-title">事件 #{{ selectedEvent.id }} 详情</h3>
-      <div class="media-grid">
-        <div class="media-panel">
-          <span class="panel-label">事件截图</span>
-          <div v-loading="mediaLoading" class="media-box">
-            <img v-if="snapshotUrl" :src="snapshotUrl" class="media-img" />
-            <span v-else-if="!mediaLoading" class="no-media">暂无截图</span>
-          </div>
+      <aside class="right-column">
+        <div class="video-card">
+          <div class="video-mark"></div>
+          <strong>结果视频</strong>
         </div>
-        <div class="media-panel">
-          <span class="panel-label">结果视频</span>
-          <div v-loading="mediaLoading" class="media-box">
-            <video v-if="videoUrl" :src="videoUrl" controls class="media-video">
-              您的浏览器不支持视频播放
-            </video>
-            <el-icon v-else-if="!mediaLoading" :size="36" color="#52657f"><VideoPlay /></el-icon>
-            <span v-if="!videoUrl && !mediaLoading" class="no-media">结果视频生成中</span>
-          </div>
+        <div class="track-card">
+          <h3>轨迹数据</h3>
+          <p>track_id: {{ trackInfo.track_id }}</p>
+          <p>start_frame: {{ trackInfo.start_frame }}</p>
+          <p>end_frame: {{ trackInfo.end_frame }}</p>
+          <p>timestamp: {{ trackInfo.timestamp }}</p>
         </div>
-      </div>
-    </div>
+      </aside>
+    </section>
   </div>
 </template>
 
 <style scoped>
-.history-page { max-width: 1080px; }
-
-.page-heading {
-  margin: 4px 0 24px;
-  color: #eaf6ff;
-  font-size: 24px;
-  font-weight: 700;
+.history-page {
+  max-width: 1080px;
 }
 
-/* Filter */
 .filter-card {
-  background: #101f33;
-  border: 1px solid #1e3a5f;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
-  padding: 14px 22px;
-  margin-bottom: 20px;
-}
-.filter-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 18px;
-  flex-wrap: wrap;
-}
-.filter-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.filter-item label {
-  color: #91a8c7;
-  font-size: 12px;
-}
-
-/* Table */
-.table-card {
-  background: #101f33;
-  border: 1px solid #1e3a5f;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
-  padding: 18px 22px;
-  margin-bottom: 24px;
-}
-.events-table {
-  --el-table-bg-color: transparent;
-  --el-table-tr-bg-color: transparent;
-  --el-table-header-bg-color: transparent;
-  --el-table-border-color: #1e3a5f;
-  --el-table-header-text-color: #91a8c7;
-  --el-table-text-color: #eaf6ff;
-  --el-table-row-hover-bg-color: rgba(0, 216, 255, 0.06);
-}
-.events-table :deep(.el-table__empty-text) { color: #52657f; }
-.events-table :deep(.el-table__body tr) { cursor: pointer; }
-.conf-cell {
-  font-weight: 700;
-  font-family: "DIN Alternate", Consolas, monospace;
-}
-.pagination-wrap {
-  display: flex;
-  justify-content: center;
-  margin-top: 16px;
-}
-
-/* Media */
-.media-card {
-  background: #101f33;
-  border: 1px solid #1e3a5f;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
-  padding: 18px 22px;
-}
-.section-title {
-  margin: 0 0 16px;
-  color: #eaf6ff;
-  font-size: 15px;
-  font-weight: 600;
-}
-.media-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 28px;
+  grid-template-columns: repeat(4, 150px) 120px;
+  justify-content: space-between;
+  gap: 0;
+  align-items: center;
+  min-height: 122px;
+  padding: 0 24px;
+  margin-bottom: 32px;
+  background: #101f33;
+  border: 1px solid #1e3a5f;
+  border-radius: 8px;
 }
-.panel-label {
-  display: block;
-  margin-bottom: 8px;
-  color: #91a8c7;
-  font-size: 13px;
-}
-.media-box {
-  min-height: 220px;
+
+.filter-card input {
+  height: 54px;
+  padding: 0 24px;
+  color: #eaf6ff;
   background: #0d1a2b;
   border: 1px solid #1e3a5f;
-  border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-.media-img {
-  width: 100%;
-  max-height: 260px;
-  object-fit: contain;
-}
-.media-video {
-  width: 100%;
-  max-height: 300px;
+  border-radius: 8px;
+  font-size: 16px;
   outline: none;
 }
-.no-media {
-  margin-top: 8px;
-  color: #52657f;
-  font-size: 13px;
+
+.filter-card input::placeholder {
+  color: #91a8c7;
+}
+
+.filter-card button {
+  height: 54px;
+  color: #04101c;
+  background: #12c6e8;
+  border: 1px solid #12c6e8;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.history-grid {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 32px;
+}
+
+.event-table,
+.video-card,
+.track-card {
+  background: #101f33;
+  border: 1px solid #1e3a5f;
+  border-radius: 8px;
+}
+
+.event-table {
+  padding: 18px 22px;
+}
+
+.table-head,
+.table-row {
+  display: grid;
+  grid-template-columns: 0.8fr 1fr 0.6fr 0.8fr;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 4px;
+  border: 0;
+  border-bottom: 1px solid #1e3a5f;
+  background: transparent;
+  color: #d6e4f2;
+  text-align: left;
+  font-size: 14px;
+}
+
+.table-head {
+  min-height: 32px;
+  color: #91a8c7;
+  font-weight: 800;
+}
+
+.table-row {
+  cursor: pointer;
+}
+
+.table-row:hover,
+.table-row.active {
+  background: rgba(0, 216, 255, 0.06);
+}
+
+.right-column {
+  display: grid;
+  gap: 24px;
+}
+
+.video-card {
+  display: grid;
+  place-items: center;
+  height: 220px;
+  background: #050b14;
+  color: #d6e4f2;
+  font-size: 18px;
+}
+
+.video-mark {
+  width: 128px;
+  height: 48px;
+  margin-bottom: -78px;
+  border-radius: 50%;
+  background: rgba(0, 216, 255, 0.12);
+}
+
+.track-card {
+  min-height: 190px;
+  padding: 24px 28px;
+}
+
+.track-card h3 {
+  margin-bottom: 28px;
+  color: #eaf6ff;
+  font-size: 20px;
+}
+
+.track-card p {
+  color: #91a8c7;
+  font-size: 16px;
+  line-height: 1.35;
 }
 </style>

@@ -1,341 +1,246 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { Bell, Check, CircleClose, WarningFilled, Search } from '@element-plus/icons-vue'
+import { computed, onMounted, ref } from 'vue'
 import { fetchEvents, updateEventStatus } from '../api/events'
-import { fetchFile } from '../api/files'
 
-// ── State ──
-const events = ref([])
+const demoEvents = [
+  { id: 1, created_at: '06-25 20:10', type: '疑似抛物事件', confidence: 0.82, status: 'unconfirmed', track_id: 12 },
+  { id: 2, created_at: '06-25 20:11', type: '疑似抛物事件', confidence: 0.78, status: 'unconfirmed', track_id: 13 },
+  { id: 3, created_at: '06-25 20:12', type: '疑似抛物事件', confidence: 0.74, status: 'unconfirmed', track_id: 14 },
+  { id: 4, created_at: '06-25 20:13', type: '疑似抛物事件', confidence: 0.70, status: 'unconfirmed', track_id: 15 },
+  { id: 5, created_at: '06-25 20:14', type: '疑似抛物事件', confidence: 0.66, status: 'unconfirmed', track_id: 16 },
+  { id: 6, created_at: '06-25 20:15', type: '疑似抛物事件', confidence: 0.62, status: 'unconfirmed', track_id: 17 },
+  { id: 7, created_at: '06-25 20:16', type: '疑似抛物事件', confidence: 0.58, status: 'unconfirmed', track_id: 18 },
+]
+
+const events = ref(demoEvents)
+const selectedEvent = ref(demoEvents[0])
 const loading = ref(false)
-const selectedEvent = ref(null)
-const snapshotUrl = ref('')
-const snapshotLoading = ref(false)
-let pollTimer = null
 
-// ── Computed ──
-const latestAlarm = computed(() => {
-  const unconfirmed = events.value.filter(e => e.status === 'unconfirmed')
-  return unconfirmed.length ? unconfirmed[0] : events.value[0] || null
-})
+const latestAlarm = computed(() => events.value.find(item => item.status === 'unconfirmed') || events.value[0])
 
-const statusTagType = (status) => {
-  const map = { unconfirmed: 'warning', confirmed: 'success', false_alarm: 'info' }
-  return map[status] || 'info'
+function selectEvent(event) {
+  selectedEvent.value = event
 }
 
-const statusLabel = (status) => {
-  const map = { unconfirmed: '待确认', confirmed: '已确认', false_alarm: '误报' }
-  return map[status] || status
+async function setEventStatus(status) {
+  if (!selectedEvent.value) return
+  try {
+    await updateEventStatus(selectedEvent.value.id, status)
+  } catch {
+    // 演示页允许后端未启动时本地更新状态
+  }
+  selectedEvent.value.status = status
 }
 
-const confidenceColor = (val) => {
-  if (val >= 0.7) return '#ff4d4f'
-  if (val >= 0.5) return '#ffb020'
-  return '#00d8ff'
-}
-
-// ── Methods ──
 async function loadEvents() {
   loading.value = true
   try {
-    const res = await fetchEvents({ limit: 100 })
-    events.value = (res.data?.events || []).slice(0, 50)
+    const res = await fetchEvents({ limit: 50 })
+    const list = res.data?.events || []
+    if (list.length) {
+      events.value = list.map(item => ({
+        ...item,
+        type: '疑似抛物事件',
+        created_at: item.created_at || '--',
+      }))
+      selectedEvent.value = events.value[0]
+    }
   } catch {
-    // silent
+    events.value = demoEvents
+    selectedEvent.value = demoEvents[0]
   } finally {
     loading.value = false
   }
 }
 
-async function confirmEvent(event) {
-  try {
-    await updateEventStatus(event.id, 'confirmed')
-    event.status = 'confirmed'
-    if (selectedEvent.value?.id === event.id) selectedEvent.value.status = 'confirmed'
-  } catch {
-    // network error — status stays unchanged
-  }
-}
-
-async function rejectEvent(event) {
-  try {
-    await updateEventStatus(event.id, 'false_alarm')
-    event.status = 'false_alarm'
-    if (selectedEvent.value?.id === event.id) selectedEvent.value.status = 'false_alarm'
-  } catch {
-    // network error — status stays unchanged
-  }
-}
-
-async function selectEvent(event) {
-  selectedEvent.value = event
-  snapshotLoading.value = true
-  if (snapshotUrl.value) {
-    URL.revokeObjectURL(snapshotUrl.value)
-    snapshotUrl.value = ''
-  }
-  try {
-    if (event.snapshot_path) {
-      const res = await fetchFile(event.snapshot_path)
-      snapshotUrl.value = URL.createObjectURL(res.data)
-    }
-  } catch {
-    snapshotUrl.value = ''
-  } finally {
-    snapshotLoading.value = false
-  }
-}
-
-// ── Lifecycle ──
-onMounted(() => {
-  loadEvents()
-  pollTimer = setInterval(loadEvents, 15000)
-})
-
-onUnmounted(() => {
-  clearInterval(pollTimer)
-  if (snapshotUrl.value) URL.revokeObjectURL(snapshotUrl.value)
-})
-
-defineOptions({ name: 'AlarmCenterView' })
+onMounted(loadEvents)
 </script>
 
 <template>
   <div class="alarm-page">
-    <h2 class="page-heading">报警中心</h2>
-
-    <!-- Hero card: latest alarm -->
-    <div v-if="latestAlarm" class="hero-card" :class="{ unconfirmed: latestAlarm.status === 'unconfirmed' }">
-      <div class="hero-left">
-        <el-icon :size="28" color="#ff4d4f"><WarningFilled /></el-icon>
-        <div class="hero-info">
-          <span class="hero-label">{{ latestAlarm.status === 'unconfirmed' ? '⚠ 最新报警' : '最近事件' }}</span>
-          <span class="hero-meta">
-            事件 #{{ latestAlarm.id }} · Track {{ latestAlarm.track_id }} · 置信度 {{ (latestAlarm.confidence * 100).toFixed(1) }}%
-          </span>
-        </div>
+    <section class="alarm-banner">
+      <h2>{{ latestAlarm ? '检测到疑似高空抛物事件' : '暂无报警事件' }}</h2>
+      <div class="banner-actions">
+        <button class="primary-action" @click="setEventStatus('confirmed')">确认事件</button>
+        <button class="secondary-action" @click="setEventStatus('false_alarm')">标记误报</button>
       </div>
-      <div class="hero-right">
-        <span class="hero-time">{{ latestAlarm.created_at }}</span>
-        <el-tag :type="statusTagType(latestAlarm.status)" size="small" effect="dark">{{ statusLabel(latestAlarm.status) }}</el-tag>
-      </div>
-    </div>
+    </section>
 
-    <!-- Events table -->
-    <div class="table-card">
-      <h3 class="section-title">报警事件列表</h3>
-      <el-table
-        :data="events"
-        v-loading="loading"
-        highlight-current-row
-        @row-click="selectEvent"
-        class="events-table"
-        size="small"
-        empty-text="暂无报警事件"
-      >
-        <el-table-column prop="id" label="ID" width="60" />
-        <el-table-column prop="created_at" label="时间" width="170" />
-        <el-table-column prop="track_id" label="跟踪ID" width="80" />
-        <el-table-column label="置信度" width="110">
-          <template #default="{ row }">
-            <span :style="{ color: confidenceColor(row.confidence) }" class="conf-cell">
-              {{ row.confidence ? (row.confidence * 100).toFixed(1) + '%' : '--' }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="statusTagType(row.status)" size="small" effect="dark">
-              {{ statusLabel(row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" min-width="160">
-          <template #default="{ row }">
-            <template v-if="row.status === 'unconfirmed'">
-              <el-button type="success" size="small" :icon="Check" @click.stop="confirmEvent(row)">确认</el-button>
-              <el-button type="info" size="small" :icon="CircleClose" @click.stop="rejectEvent(row)">误报</el-button>
-            </template>
-            <span v-else class="done-label">
-              {{ row.status === 'confirmed' ? '已确认' : '已排除' }}
-            </span>
-          </template>
-        </el-table-column>
-      </el-table>
-    </div>
-
-    <!-- Detail panel -->
-    <div v-if="selectedEvent" class="detail-card">
-      <h3 class="section-title">事件详情 #{{ selectedEvent.id }}</h3>
-      <div class="detail-grid">
-        <div class="detail-snapshot">
-          <div v-loading="snapshotLoading" class="snapshot-box">
-            <img v-if="snapshotUrl" :src="snapshotUrl" class="snapshot-img" />
-            <el-icon v-else :size="36" color="#52657f"><Search /></el-icon>
-            <span v-if="!snapshotUrl && !snapshotLoading" class="no-snapshot">暂无截图</span>
-          </div>
+    <section class="alarm-grid">
+      <div class="event-table" v-loading="loading">
+        <div class="table-head">
+          <span>时间</span>
+          <span>类型</span>
+          <span>置信度</span>
+          <span>状态</span>
         </div>
-        <div class="detail-info">
-          <div class="info-row"><span class="info-key">事件ID</span><span>{{ selectedEvent.id }}</span></div>
-          <div class="info-row"><span class="info-key">跟踪ID</span><span>{{ selectedEvent.track_id }}</span></div>
-          <div class="info-row"><span class="info-key">置信度</span>
-            <span :style="{ color: confidenceColor(selectedEvent.confidence) }">
-              {{ selectedEvent.confidence ? (selectedEvent.confidence * 100).toFixed(1) + '%' : '--' }}
-            </span>
-          </div>
-          <div class="info-row"><span class="info-key">状态</span>
-            <el-tag :type="statusTagType(selectedEvent.status)" size="small" effect="dark">{{ statusLabel(selectedEvent.status) }}</el-tag>
-          </div>
-          <div class="info-row"><span class="info-key">时间</span><span>{{ selectedEvent.created_at }}</span></div>
-          <div class="info-row"><span class="info-key">任务ID</span><span>{{ selectedEvent.video_task_id }}</span></div>
-        </div>
+        <button
+          v-for="event in events"
+          :key="event.id"
+          class="table-row"
+          :class="{ active: selectedEvent?.id === event.id }"
+          @click="selectEvent(event)"
+        >
+          <span>{{ event.created_at }}</span>
+          <span>{{ event.type }}</span>
+          <span>{{ Number(event.confidence || 0).toFixed(2) }}</span>
+          <span>{{ event.status === 'unconfirmed' ? '未确认' : event.status }}</span>
+        </button>
       </div>
-    </div>
+
+      <aside class="right-column">
+        <div class="snapshot-card">
+          <div class="snapshot-mark"></div>
+          <strong>事件截图</strong>
+        </div>
+        <div class="detail-card">
+          <h3>事件详情</h3>
+          <p>状态：{{ selectedEvent?.status || 'unconfirmed' }}</p>
+          <p>置信度：{{ selectedEvent ? Number(selectedEvent.confidence || 0).toFixed(2) : '0.86' }}</p>
+          <p>轨迹：连续下降帧占比 78%</p>
+          <p>ROI：命中</p>
+        </div>
+      </aside>
+    </section>
   </div>
 </template>
 
 <style scoped>
-.alarm-page { max-width: 1080px; }
-
-.page-heading {
-  margin: 4px 0 24px;
-  color: #eaf6ff;
-  font-size: 24px;
-  font-weight: 700;
+.alarm-page {
+  max-width: 1080px;
+  min-height: calc(100vh - 136px);
+  padding: 0;
 }
 
-/* Hero */
-.hero-card {
+.alarm-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 28px;
-  margin-bottom: 24px;
-  background: #101f33;
-  border: 1px solid #1e3a5f;
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
-}
-.hero-card.unconfirmed {
-  border-color: #ff4d4f;
-  box-shadow: 0 0 20px rgba(255, 77, 79, 0.18);
-}
-.hero-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.hero-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.hero-label {
-  color: #eaf6ff;
-  font-size: 16px;
-  font-weight: 700;
-}
-.hero-meta {
-  color: #91a8c7;
-  font-size: 13px;
-}
-.hero-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.hero-time {
-  color: #91a8c7;
-  font-size: 13px;
-}
-
-/* Table */
-.table-card {
-  background: #101f33;
-  border: 1px solid #1e3a5f;
+  min-height: 116px;
+  padding: 0 28px;
+  margin-bottom: 32px;
+  background: rgba(255, 77, 79, 0.11);
+  border: 1px solid #ff4d4f;
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
-  padding: 18px 22px;
-  margin-bottom: 24px;
 }
-.section-title {
-  margin: 0 0 16px;
-  color: #eaf6ff;
+
+.alarm-banner h2 {
+  color: #ff4d4f;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.banner-actions {
+  display: flex;
+  gap: 14px;
+}
+
+.banner-actions button {
+  min-width: 128px;
+  height: 48px;
+  border-radius: 8px;
   font-size: 15px;
-  font-weight: 600;
-}
-.conf-cell {
-  font-weight: 700;
-  font-family: "DIN Alternate", Consolas, monospace;
-}
-.done-label {
-  color: #52657f;
-  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
 }
 
-/* Table overrides */
-.events-table {
-  --el-table-bg-color: transparent;
-  --el-table-tr-bg-color: transparent;
-  --el-table-header-bg-color: transparent;
-  --el-table-border-color: #1e3a5f;
-  --el-table-header-text-color: #91a8c7;
-  --el-table-text-color: #eaf6ff;
-  --el-table-row-hover-bg-color: rgba(0, 216, 255, 0.06);
+.primary-action {
+  color: #04101c;
+  background: #12c6e8;
+  border: 1px solid #12c6e8;
 }
-.events-table :deep(.el-table__empty-text) { color: #52657f; }
-.events-table :deep(.el-table__body tr) { cursor: pointer; }
 
-/* Detail */
+.secondary-action {
+  color: #eaf6ff;
+  background: #0b1728;
+  border: 1px solid #1e3a5f;
+}
+
+.alarm-grid {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 32px;
+}
+
+.event-table,
+.snapshot-card,
 .detail-card {
   background: #101f33;
   border: 1px solid #1e3a5f;
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
-  padding: 18px 22px;
 }
-.detail-grid {
+
+.event-table {
+  padding: 20px 24px;
+}
+
+.table-head,
+.table-row {
   display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 28px;
-}
-.snapshot-box {
-  min-height: 200px;
-  background: #0d1a2b;
-  border: 1px solid #1e3a5f;
-  border-radius: 6px;
-  display: flex;
-  flex-direction: column;
+  grid-template-columns: 0.8fr 1fr 0.6fr 0.8fr;
   align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-.snapshot-img {
   width: 100%;
-  height: 100%;
-  object-fit: contain;
-  max-height: 260px;
-}
-.no-snapshot {
-  margin-top: 8px;
-  color: #52657f;
-  font-size: 13px;
-}
-.detail-info {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.info-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  color: #eaf6ff;
+  min-height: 52px;
+  padding: 0 4px;
+  border: 0;
+  border-bottom: 1px solid #1e3a5f;
+  background: transparent;
+  color: #d6e4f2;
+  text-align: left;
   font-size: 14px;
 }
-.info-key {
+
+.table-head {
+  min-height: 32px;
   color: #91a8c7;
-  width: 70px;
-  flex-shrink: 0;
+  font-weight: 800;
+}
+
+.table-row {
+  cursor: pointer;
+}
+
+.table-row:hover,
+.table-row.active {
+  background: rgba(0, 216, 255, 0.06);
+}
+
+.right-column {
+  display: grid;
+  gap: 24px;
+}
+
+.snapshot-card {
+  display: grid;
+  place-items: center;
+  height: 246px;
+  background: #050b14;
+  color: #d6e4f2;
+  font-size: 18px;
+}
+
+.snapshot-mark {
+  width: 128px;
+  height: 48px;
+  margin-bottom: -78px;
+  border-radius: 50%;
+  background: rgba(0, 216, 255, 0.12);
+}
+
+.detail-card {
+  min-height: 214px;
+  padding: 28px 30px;
+}
+
+.detail-card h3 {
+  margin-bottom: 28px;
+  color: #eaf6ff;
+  font-size: 20px;
+}
+
+.detail-card p {
+  color: #91a8c7;
+  font-size: 16px;
+  line-height: 1.35;
 }
 </style>
