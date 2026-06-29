@@ -210,4 +210,180 @@ test.describe('视频分析页', () => {
     await page.click('.upload-panel .el-button--primary')
     await expect(page.locator('.roi-canvas')).toBeVisible({ timeout: 8000 })
   })
+
+  test('ROI绘制后显示readout坐标', async ({ page }) => {
+    await page.route('**/api/videos/upload', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          data: { task_id: 1, filename: 'test.mp4', size: 1024000, total_frames: 240 },
+        }),
+      })
+    })
+
+    await page.setInputFiles('input[type="file"]', {
+      name: 'test.mp4',
+      mimeType: 'video/mp4',
+      buffer: Buffer.from('fake-video'),
+    })
+    await page.click('.upload-panel .el-button--primary')
+    await expect(page.locator('.roi-canvas')).toBeVisible({ timeout: 8000 })
+
+    // Simulate ROI drawing via mousedown/mousemove/mouseup
+    const canvas = page.locator('.roi-canvas')
+    const box = await canvas.boundingBox()
+    await page.mouse.move(box.x + 100, box.y + 100)
+    await page.mouse.down()
+    await page.mouse.move(box.x + 300, box.y + 250, { steps: 5 })
+    await page.mouse.up()
+
+    // ROI readout should appear
+    await expect(page.locator('.roi-readout')).toBeVisible({ timeout: 3000 })
+  })
+
+  test('Mock事件确认为confirmed', async ({ page }) => {
+    let pollCount = 0
+
+    await page.route('**/api/videos/upload', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          data: { task_id: 99, filename: 'e.mp4', size: 512000, total_frames: 100 },
+        }),
+      })
+    })
+
+    await page.route('**/api/tasks/99/analyze', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 200, data: { task_id: 99, status: 'running' } }),
+      })
+    })
+
+    await page.route('**/api/tasks/99', (route) => {
+      pollCount++
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          data: {
+            id: 99, status: pollCount >= 2 ? 'success' : 'running',
+            total_frames: 100, processed_frames: pollCount >= 2 ? 100 : 50,
+            progress: pollCount >= 2 ? 100 : 50,
+            result_video_path: null,
+            events: [{ id: 1, track_id: 1, confidence: 0.92, status: 'unconfirmed' }],
+          },
+        }),
+      })
+    })
+
+    // Mock events API
+    await page.route('**/api/events?task_id=99', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          data: { events: [{ id: 1, track_id: 1, confidence: 0.92, status: 'unconfirmed' }], count: 1 },
+        }),
+      })
+    })
+
+    // Mock event status update
+    await page.route('**/api/events/1/status', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 200, data: { event_id: 1, status: 'confirmed' }, message: '状态已更新' }),
+      })
+    })
+
+    await page.setInputFiles('input[type="file"]', {
+      name: 'e.mp4', mimeType: 'video/mp4', buffer: Buffer.from('data'),
+    })
+    await page.click('.upload-panel .el-button--primary')
+    await expect(page.locator('.roi-canvas')).toBeVisible({ timeout: 8000 })
+
+    // Draw ROI
+    const canvas2 = page.locator('.roi-canvas')
+    const box2 = await canvas2.boundingBox()
+    await page.mouse.move(box2.x + 50, box2.y + 50)
+    await page.mouse.down()
+    await page.mouse.move(box2.x + 200, box2.y + 180, { steps: 5 })
+    await page.mouse.up()
+    await expect(page.locator('.roi-readout')).toBeVisible({ timeout: 3000 })
+
+    // Click analyze
+    await page.click('.analyze-btn')
+
+    // Wait for analysis to complete
+    await expect(page.locator('.event-mini-list')).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('.event-mini-row')).toBeVisible()
+
+    // Click confirm button
+    await page.click('.event-mini-actions .el-button--success')
+    await expect(page.locator('.el-message--success').first()).toBeVisible({ timeout: 3000 })
+  })
+
+  test('el-progress在分析中显示', async ({ page }) => {
+    await page.route('**/api/videos/upload', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          data: { task_id: 7, filename: 'p.mp4', size: 512000, total_frames: 300 },
+        }),
+      })
+    })
+
+    await page.route('**/api/tasks/7/analyze', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 200, data: { task_id: 7, status: 'running' } }),
+      })
+    })
+
+    await page.route('**/api/tasks/7', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 200,
+          data: {
+            id: 7, status: 'running', total_frames: 300, processed_frames: 120,
+            progress: 40, events: [], result_video_path: null,
+          },
+        }),
+      })
+    })
+
+    await page.setInputFiles('input[type="file"]', {
+      name: 'p.mp4', mimeType: 'video/mp4', buffer: Buffer.from('x'),
+    })
+    await page.click('.upload-panel .el-button--primary')
+    await expect(page.locator('.roi-canvas')).toBeVisible({ timeout: 8000 })
+
+    // Draw ROI
+    const canvas3 = page.locator('.roi-canvas')
+    const box3 = await canvas3.boundingBox()
+    await page.mouse.move(box3.x + 40, box3.y + 40)
+    await page.mouse.down()
+    await page.mouse.move(box3.x + 220, box3.y + 190, { steps: 5 })
+    await page.mouse.up()
+    await expect(page.locator('.roi-readout')).toBeVisible({ timeout: 3000 })
+
+    // Click analyze to start
+    await page.click('.analyze-btn')
+
+    // Sidebar task status should show progress during analysis
+    await expect(page.locator('.task-status')).toContainText('分析中', { timeout: 10000 })
+  })
 })

@@ -2,13 +2,27 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import subprocess
+import sys
 import threading
+from pathlib import Path
 from typing import Any
 
 from backend.app.core.database import get_db
+from backend.app.services.event_service import (
+    batch_insert_detections,
+    batch_insert_events,
+    batch_insert_tracks,
+)
 
 logger = logging.getLogger("backend.task_service")
+
+# Conda Python path (has torch + ultralytics)
+_CONDA_PYTHON = r"D:\Soft\Conda\python.exe"
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+_PIPELINE_CLI = _PROJECT_ROOT / "scripts" / "pipeline_cli.py"
 
 
 # ── Task CRUD ──────────────────────────────────────────────────────────
@@ -54,6 +68,20 @@ def get_task(task_id: int) -> dict | None:
     task = dict(row)
     total = task.get("total_frames", 0)
     processed = task.get("processed_frames", 0)
+
+    # Read live progress from pipeline for running tasks
+    if task.get("status") == "running":
+        progress_file = _PROJECT_ROOT / "outputs" / f"task_{task_id}" / "progress.json"
+        try:
+            if progress_file.is_file():
+                data = json.loads(progress_file.read_text(encoding="utf-8"))
+                live_processed = data.get("frame", 0)
+                if live_processed > processed:
+                    processed = live_processed
+                    task["processed_frames"] = processed
+        except Exception:
+            pass
+
     task["progress"] = round(processed / total * 100, 1) if total > 0 else 0
 
     # Attach related events
@@ -99,114 +127,73 @@ def _run_analysis(task_id: int, roi: dict[str, int], settings: dict[str, Any]) -
             logger.error("Task %d: not found", task_id)
             return
 
-        from algorithm.pipeline import run_video_analysis
+        # Save ROI to DB (#003 fix)
+        if roi:
+            update_task(
+                task_id,
+                roi_x=roi.get("x", 0),
+                roi_y=roi.get("y", 0),
+                roi_width=roi.get("width"),
+                roi_height=roi.get("height"),
+            )
 
-        result = run_video_analysis(
-            video_path=task["source_path"],
-            output_dir="uploads/results",
-            roi=roi or {},
-            settings=settings,
+        output_dir = f"outputs/task_{task_id}"
+
+        # Run algorithm via subprocess (needs Conda Python for torch/ultralytics)
+        cmd = [
+            _CONDA_PYTHON,
+            str(_PIPELINE_CLI),
+            "--video", task["source_path"],
+            "--output-dir", output_dir,
+            "--roi", json.dumps(roi or {}),
+            "--settings", json.dumps(settings),
+            "--model", str(_PROJECT_ROOT / "models" / "best.pt"),
+        ]
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=600,
+            cwd=str(_PROJECT_ROOT),
+            env={**__import__("os").environ, "KMP_DUPLICATE_LIB_OK": "1"},
         )
+        if proc.returncode != 0:
+            logger.error("Task %d: pipeline subprocess failed, rc=%d stderr=%s", task_id, proc.returncode, proc.stderr[-500:])
+            update_task(task_id, status="failed", error_message="算法子进程异常退出")
+            return
 
-        if result.status == "success":
+        result_data = json.loads(proc.stdout)
+        status_val = result_data.get("status", "failed")
+
+        if status_val == "success":
             update_task(
                 task_id,
                 status="success",
-                processed_frames=task["total_frames"],
-                result_video_path=result.result_video_path,
+                total_frames=result_data.get("total_frames", task["total_frames"]),
+                processed_frames=result_data.get("processed_frames", task["total_frames"]),
+                result_video_path=result_data.get("result_video_path"),
             )
-            _write_events(task_id, result.events)
-            _write_detections(task_id, result.detection_results)
-            _write_tracks(task_id, result.tracking_results)
-        elif result.status == "not_ready":
-            update_task(
-                task_id,
-                status="failed",
-                error_message=result.error_message or "算法模块未就绪",
-            )
+            events = result_data.get("events", [])
+            detections = result_data.get("detection_results", [])
+            tracks = result_data.get("tracking_results", [])
+            if events:
+                batch_insert_events(task_id, events)
+            if detections:
+                batch_insert_detections(task_id, detections)
+            if tracks:
+                batch_insert_tracks(task_id, tracks)
         else:
             update_task(
                 task_id,
                 status="failed",
-                error_message=result.error_message or "未知错误",
+                error_message=result_data.get("error_message") or "未知错误",
             )
 
-        logger.info("Task %d: completed with status=%s", task_id, result.status)
+        logger.info("Task %d: completed with status=%s", task_id, status_val)
 
     except Exception:
         logger.exception("Task %d: unhandled exception", task_id)
         update_task(task_id, status="failed", error_message="后台分析异常")
-
-
-def _write_events(task_id: int, events: list[dict[str, Any]]) -> None:
-    if not events:
-        return
-    db = get_db()
-    for evt in events:
-        db.execute(
-            """INSERT INTO events (video_task_id, track_id, confidence, status,
-               snapshot_path)
-               VALUES (?, ?, ?, ?, ?)""",
-            (
-                task_id,
-                evt.get("track_id"),
-                evt.get("confidence"),
-                "unconfirmed",
-                evt.get("snapshot_path"),
-            ),
-        )
-    db.commit()
-    db.close()
-
-
-def _write_detections(task_id: int, detections: list[dict[str, Any]]) -> None:
-    if not detections:
-        return
-    db = get_db()
-    for det in detections:
-        db.execute(
-            """INSERT INTO detection_results (video_task_id, frame_id,
-               bbox_x, bbox_y, bbox_width, bbox_height, confidence, class_name)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                task_id,
-                det.get("frame_id"),
-                det.get("bbox_x"),
-                det.get("bbox_y"),
-                det.get("bbox_width"),
-                det.get("bbox_height"),
-                det.get("confidence"),
-                det.get("class_name", "falling_object"),
-            ),
-        )
-    db.commit()
-    db.close()
-
-
-def _write_tracks(task_id: int, tracks: list[dict[str, Any]]) -> None:
-    if not tracks:
-        return
-    db = get_db()
-    for trk in tracks:
-        db.execute(
-            """INSERT INTO tracking_results (video_task_id, track_id, frame_id,
-               timestamp, center_x, center_y, bbox_x, bbox_y, bbox_width, bbox_height)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                task_id,
-                trk.get("track_id"),
-                trk.get("frame_id"),
-                trk.get("timestamp"),
-                trk.get("center_x"),
-                trk.get("center_y"),
-                trk.get("bbox_x"),
-                trk.get("bbox_y"),
-                trk.get("bbox_width"),
-                trk.get("bbox_height"),
-            ),
-        )
-    db.commit()
-    db.close()
 
 
 def start_analysis(task_id: int, roi: dict[str, int], settings: dict[str, Any]) -> None:
