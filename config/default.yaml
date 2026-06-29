@@ -1,0 +1,20 @@
+# Default threshold configuration for behavior recognition (6-parameter rule).
+# All values are tunable; these defaults match docs/algorithm-interface.md Section 3.4.
+
+# YOLO detection confidence threshold — boxes below this are discarded
+detect_confidence: 0.35
+
+# Min fraction of trajectory frames where the center y-coordinate decreases
+downward_ratio: 0.55
+
+# Min cumulative vertical displacement (pixels) to trigger
+min_vertical_distance: 50
+
+# Min consecutive tracked frames before a target can trigger an event
+min_track_frames: 5
+
+# Min fraction of trajectory points that must fall inside the ROI
+roi_required_ratio: 0.5
+
+# Cooldown in seconds — same track_id cannot re-trigger within this window
+alarm_cooldown_seconds: 10

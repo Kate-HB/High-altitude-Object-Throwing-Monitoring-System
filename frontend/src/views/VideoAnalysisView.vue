@@ -1,5 +1,6 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
+defineOptions({ name: 'VideoAnalysisView' })
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { uploadVideo, analyzeTask, fetchTask } from '../api/videos'
 import { fetchEvents, updateEventStatus } from '../api/events'
@@ -56,6 +57,10 @@ const videoUrl = ref(null)
 const videoRef = ref(null)
 const canvasRef = ref(null)
 const resultVideoUrl = ref(null)
+const previewUrl = ref(null)
+
+function openPreview(url) { previewUrl.value = url }
+function closePreview() { previewUrl.value = null }
 
 // ── ROI drawing ──
 const roi = ref({ x: 0, y: 0, width: null, height: null })
@@ -298,6 +303,7 @@ const taskError = ref('')
 const events = ref([])
 const processedFrames = ref(0)
 const resultVideoPath = ref('')
+const snapshotUrls = ref({}) // eventId -> blob URL
 let pollTimer = null
 
 async function doAnalyze() {
@@ -346,6 +352,7 @@ function startPolling() {
         taskError.value = t.error_message || ''
         if (t.status === 'success') {
           await loadResultVideo(t.result_video_path)
+          await loadSnapshotImages(events.value)
           ElMessage.success('分析完成')
         } else {
           ElMessage.error(t.error_message || '分析失败')
@@ -365,6 +372,18 @@ async function loadResultVideo(path) {
     resultVideoUrl.value = URL.createObjectURL(res.data)
   } catch {
     resultVideoUrl.value = null
+  }
+}
+
+async function loadSnapshotImages(evts) {
+  for (const evt of evts) {
+    if (!evt.snapshot_path || snapshotUrls.value[evt.id]) continue
+    try {
+      const res = await fetchFile(evt.snapshot_path)
+      snapshotUrls.value[evt.id] = URL.createObjectURL(res.data)
+    } catch {
+      // ignore
+    }
   }
 }
 
@@ -394,6 +413,19 @@ onBeforeUnmount(() => {
   if (pollTimer) clearInterval(pollTimer)
   if (videoUrl.value) URL.revokeObjectURL(videoUrl.value)
   if (resultVideoUrl.value) URL.revokeObjectURL(resultVideoUrl.value)
+  Object.values(snapshotUrls.value).forEach(url => URL.revokeObjectURL(url))
+})
+
+onDeactivated(() => {
+  // Pause polling when navigating away (keep-alive)
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+})
+
+onActivated(() => {
+  // Resume polling if task is still running
+  if (taskStatus.value === 'running' && !pollTimer) {
+    startPolling()
+  }
 })
 
 // ── Status helpers ──
@@ -434,6 +466,8 @@ function reset() {
   if (fileInput.value) fileInput.value.value = ''
   if (videoUrl.value) { URL.revokeObjectURL(videoUrl.value); videoUrl.value = null }
   if (resultVideoUrl.value) { URL.revokeObjectURL(resultVideoUrl.value); resultVideoUrl.value = null }
+  Object.values(snapshotUrls.value).forEach(url => URL.revokeObjectURL(url))
+  snapshotUrls.value = {}
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
 }
 </script>
@@ -564,6 +598,13 @@ function reset() {
         <div v-if="events.length" class="event-mini-list">
           <h4 class="event-mini-title">检出事件</h4>
           <div v-for="evt in events" :key="evt.id" class="event-mini-row">
+            <img
+              v-if="snapshotUrls[evt.id]"
+              :src="snapshotUrls[evt.id]"
+              class="event-snapshot"
+              @click="openPreview(snapshotUrls[evt.id])"
+              title="点击查看大图"
+            />
             <div class="event-mini-info">
               <span class="event-mini-id">#{{ evt.track_id }}</span>
               <span class="event-mini-conf">{{ (evt.confidence * 100).toFixed(0) }}%</span>
@@ -579,6 +620,11 @@ function reset() {
         <el-button v-if="step === 'done'" class="new-btn" @click="reset">分析新视频</el-button>
       </aside>
     </section>
+
+    <!-- Preview overlay -->
+    <div v-if="previewUrl" class="preview-overlay" @click="closePreview">
+      <img :src="previewUrl" class="preview-image" @click.stop />
+    </div>
   </div>
 </template>
 
@@ -743,14 +789,15 @@ function reset() {
 
 .roi-readout {
   position: absolute;
-  left: 16px;
-  bottom: 14px;
-  padding: 5px 10px;
+  left: 12px;
+  top: 12px;
+  padding: 4px 10px;
   color: #00d8ff;
-  background: rgba(7, 17, 31, 0.82);
+  background: rgba(7, 17, 31, 0.88);
   border: 1px solid #1e3a5f;
   border-radius: 6px;
   font-size: 12px;
+  pointer-events: none;
 }
 
 .roi-hint {
@@ -838,9 +885,6 @@ function reset() {
 .analyze-btn,
 .new-btn {
   width: 100%;
-}
-
-.new-btn {
   margin-top: 10px;
 }
 
@@ -888,8 +932,41 @@ function reset() {
   font-size: 12px;
 }
 
+.event-snapshot {
+  width: 100%;
+  height: auto;
+  max-height: 120px;
+  object-fit: contain;
+  border-radius: 4px;
+  border: 1px solid #1e3a5f;
+  cursor: pointer;
+  margin-bottom: 6px;
+  background: #050b14;
+}
+
 .event-mini-actions {
   display: flex;
   gap: 6px;
+}
+
+/* Preview overlay */
+.preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.preview-image {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 0 60px rgba(0, 216, 255, 0.15);
+  cursor: default;
 }
 </style>
