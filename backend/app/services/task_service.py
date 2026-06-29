@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import subprocess
+import sys
 import threading
+from pathlib import Path
 from typing import Any
 
 from backend.app.core.database import get_db
@@ -14,6 +18,11 @@ from backend.app.services.event_service import (
 )
 
 logger = logging.getLogger("backend.task_service")
+
+# Conda Python path (has torch + ultralytics)
+_CONDA_PYTHON = r"D:\Soft\Conda\python.exe"
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+_PIPELINE_CLI = _PROJECT_ROOT / "scripts" / "pipeline_cli.py"
 
 
 # ── Task CRUD ──────────────────────────────────────────────────────────
@@ -59,6 +68,20 @@ def get_task(task_id: int) -> dict | None:
     task = dict(row)
     total = task.get("total_frames", 0)
     processed = task.get("processed_frames", 0)
+
+    # Read live progress from pipeline for running tasks
+    if task.get("status") == "running":
+        progress_file = _PROJECT_ROOT / "outputs" / f"task_{task_id}" / "progress.json"
+        try:
+            if progress_file.is_file():
+                data = json.loads(progress_file.read_text(encoding="utf-8"))
+                live_processed = data.get("frame", 0)
+                if live_processed > processed:
+                    processed = live_processed
+                    task["processed_frames"] = processed
+        except Exception:
+            pass
+
     task["progress"] = round(processed / total * 100, 1) if total > 0 else 0
 
     # Attach related events
@@ -114,40 +137,59 @@ def _run_analysis(task_id: int, roi: dict[str, int], settings: dict[str, Any]) -
                 roi_height=roi.get("height"),
             )
 
-        from algorithm.pipeline import run_video_analysis
+        output_dir = f"outputs/task_{task_id}"
 
-        result = run_video_analysis(
-            video_path=task["source_path"],
-            output_dir="uploads/results",
-            roi=roi or {},
-            settings=settings,
+        # Run algorithm via subprocess (needs Conda Python for torch/ultralytics)
+        cmd = [
+            _CONDA_PYTHON,
+            str(_PIPELINE_CLI),
+            "--video", task["source_path"],
+            "--output-dir", output_dir,
+            "--roi", json.dumps(roi or {}),
+            "--settings", json.dumps(settings),
+            "--model", str(_PROJECT_ROOT / "models" / "best.pt"),
+        ]
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=600,
+            cwd=str(_PROJECT_ROOT),
+            env={**__import__("os").environ, "KMP_DUPLICATE_LIB_OK": "1"},
         )
+        if proc.returncode != 0:
+            logger.error("Task %d: pipeline subprocess failed, rc=%d stderr=%s", task_id, proc.returncode, proc.stderr[-500:])
+            update_task(task_id, status="failed", error_message="算法子进程异常退出")
+            return
 
-        if result.status == "success":
+        result_data = json.loads(proc.stdout)
+        status_val = result_data.get("status", "failed")
+
+        if status_val == "success":
             update_task(
                 task_id,
                 status="success",
-                total_frames=result.total_frames or task["total_frames"],
-                processed_frames=result.processed_frames or task["total_frames"],
-                result_video_path=result.result_video_path,
+                total_frames=result_data.get("total_frames", task["total_frames"]),
+                processed_frames=result_data.get("processed_frames", task["total_frames"]),
+                result_video_path=result_data.get("result_video_path"),
             )
-            batch_insert_events(task_id, result.events)
-            batch_insert_detections(task_id, result.detection_results)
-            batch_insert_tracks(task_id, result.tracking_results)
-        elif result.status == "not_ready":
-            update_task(
-                task_id,
-                status="failed",
-                error_message=result.error_message or "算法模块未就绪",
-            )
+            events = result_data.get("events", [])
+            detections = result_data.get("detection_results", [])
+            tracks = result_data.get("tracking_results", [])
+            if events:
+                batch_insert_events(task_id, events)
+            if detections:
+                batch_insert_detections(task_id, detections)
+            if tracks:
+                batch_insert_tracks(task_id, tracks)
         else:
             update_task(
                 task_id,
                 status="failed",
-                error_message=result.error_message or "未知错误",
+                error_message=result_data.get("error_message") or "未知错误",
             )
 
-        logger.info("Task %d: completed with status=%s", task_id, result.status)
+        logger.info("Task %d: completed with status=%s", task_id, status_val)
 
     except Exception:
         logger.exception("Task %d: unhandled exception", task_id)

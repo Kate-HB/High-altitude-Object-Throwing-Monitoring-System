@@ -27,7 +27,7 @@
 - 只有收到用户明确指令后，才切换到下一角色的分支继续
 - **禁止**在用户未确认前一个人的PR的情况下，自动推进到下一人
 
-石义焌（算法）暂不纳入此流程。
+石义焌（算法）不纳入串行确认流程。算法开发独立于前后端，接口已冻结（`docs/algorithm-interface.md`），变动通过罗龙飞协调。
 
 ## 3. 每个角色的执行模板
 
@@ -169,56 +169,39 @@
 - 日志要写协调了谁、解决了什么冲突、系统推进到哪一步
 - 最后执行，可以利用前三个角色的产出做复核
 
-## 5. 石义焌（算法）缺口处理
+## 5. 石义焌（算法）状态
 
-石义焌的算法（YOLOv11、DeepSORT、轨迹判断）暂时不通过此工作流执行。这会导致中间链路存在缺口。
+石义焌的算法模块（YOLOv11检测、IOU跟踪、6条件行为识别）已于 **6/29 完成并集成**。
 
-### 5.1 缺口影响范围
-
-```
-上传视频 → 创建任务 → [算法分析] → 事件入库 → 报警展示 → 历史回放 → 数据看板
-                       ↑
-                   石义焌负责，暂无产出
-```
-
-### 5.2 各角色如何绕过缺口
-
-**陈磊（后端）：**
-- 调用 `run_video_analysis()` 占位函数，返回 `status="not_ready"`
-- 后台线程框架仍然完整：创建任务 → pending → running → 调用算法 → 收到结果 → 更新状态
-- 算法未就绪时，收到 `not_ready` 后设为 `failed`
-- 后端接口、数据库、文件存储不受影响，可以独立开发和测试
-
-**刘康（前端）：**
-- 上传、ROI绘制、进度条、结果区域照常开发
-- 算法未就绪时显示"Detection model is not loaded"
-- 前端用Mock数据验证页面交互，不依赖真实检测结果
-- Playwright测试通过 `page.route()` Mock所有API，不依赖后端和算法
-
-**杨锦辉（测试）：**
-- 上传→任务创建→状态查询 链路可完整测试
-- 异常路径可测试：算法不可用时的后端行为、前端展示
-- 数据库验证不依赖算法：表结构、默认参数、任务记录可独立验证
-- 事件入库、报警、回放的测试需要等石义焌产出后才能执行
-- Playwright前端测试可独立运行，Mock全部API
-
-**罗龙飞（协调）：**
-- 接口合同已冻结（`docs/algorithm-interface.md`），算法按合同接入即可
-- 6/28是算法首次集成节点，之前三人的工作都在为那天做准备
-
-### 5.3 到6/28之前可测的闭环
+### 5.1 已完成模块
 
 ```
-登录 → 上传视频 → 绘制ROI → 创建任务 → 调用算法占位 → 状态变化 → 前端展示进度
-                                              ↓
-                                   返回 not_ready → failed
+上传视频 → 创建任务 → [YOLO检测→IOU追踪→行为评估] → 事件入库 → 报警展示 → 历史回放 → 数据看板
+                       ↑ 已完成，通过subprocess桥接
 ```
 
-真正需要算法的地方（检测框、track_id、轨迹、事件、结果视频）在6/28石义焌交付后接入，函数签名不变，后端和前端代码无需改动。
+- `algorithm/detection/detector.py` — YOLOv11检测器
+- `algorithm/tracking/tracker.py` — IOU贪心多目标跟踪（DeepSORT降级）
+- `algorithm/behavior/behavior.py` — 6条件行为评估（线性回归斜率法）
+- `algorithm/pipeline.py` — 全链路编排，每帧写progress.json
+- `scripts/pipeline_cli.py` — 子进程CLI桥接（后端.venv→Conda Python）
+- `config/default.yaml` — 6参数默认阈值
+- `backend/app/api/files.py` — 结果视频/快照文件服务
+- 模型：`models/best.pt`（v3+最佳权重）
 
-### 5.4 如果6/28算法仍阻塞
+### 5.2 集成方式
 
-按开发计划第9节备用方案：保留 `run_video_analysis()` 签名，函数内部用简化逻辑（随机track_id + 简单移动规则）生成mock结果，保证主链路联调和演示闭环。算法真实模型后续再替换。
+- 后端 `task_service.py` 通过 `subprocess.run` 调用 Conda Python 执行 `pipeline_cli.py`
+- `run_video_analysis()` 签名保持 `docs/algorithm-interface.md` 合同不变
+- 结果视频编码：MSMF+H264（Windows Media Foundation）
+- 实时进度：pipeline每帧写`progress.json`，get_task运行时读取
+
+### 5.3 已知限制
+
+- DeepSORT未安装（当前用IOU tracker降级）
+- 阈值需根据实际场景调优
+- 结果视频画质可优化
+- 石义焌不纳入串行确认流程，算法变动通过罗龙飞协调
 
 ## 6. 每日站会（15:00）
 
