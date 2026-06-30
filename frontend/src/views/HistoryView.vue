@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { fetchEvents } from '../api/events'
+import { fetchFile } from '../api/files'
 
 const demoEvents = [
   { id: 1, created_at: '06-25 20:10', type: '疑似抛物事件', confidence: 0.82, status: 'unconfirmed', track_id: 12 },
@@ -15,6 +16,8 @@ const demoEvents = [
 
 const allEvents = ref(demoEvents)
 const selectedEvent = ref(demoEvents[0])
+const videoUrl = ref(null)
+const fullVideoUrl = ref(null)
 const loading = ref(false)
 const filters = ref({ status: '', start: '', end: '', confidence: '' })
 
@@ -43,14 +46,26 @@ function goPage(p) {
   page.value = Math.max(1, Math.min(totalPages.value, p))
 }
 
-function selectEvent(event) {
+async function selectEvent(event) {
   selectedEvent.value = event
+  if (videoUrl.value) { URL.revokeObjectURL(videoUrl.value); videoUrl.value = null }
+  if (event.task_result_video_path) {
+    try {
+      const res = await fetchFile(event.task_result_video_path)
+      videoUrl.value = URL.createObjectURL(res.data)
+    } catch { /* ignore */ }
+  }
 }
 
 function doQuery() {
   page.value = 1
   loadEvents()
 }
+
+function openFullVideo() {
+  if (videoUrl.value) fullVideoUrl.value = videoUrl.value
+}
+function closeFullVideo() { fullVideoUrl.value = null }
 
 async function loadEvents() {
   loading.value = true
@@ -66,6 +81,14 @@ async function loadEvents() {
         created_at: item.created_at || '--',
       }))
       selectedEvent.value = allEvents.value[0]
+      const first = allEvents.value[0]
+      if (videoUrl.value) { URL.revokeObjectURL(videoUrl.value); videoUrl.value = null }
+      if (first?.task_result_video_path) {
+        try {
+          const r = await fetchFile(first.task_result_video_path)
+          videoUrl.value = URL.createObjectURL(r.data)
+        } catch { /* ignore */ }
+      }
     }
   } catch {
     allEvents.value = demoEvents
@@ -74,6 +97,10 @@ async function loadEvents() {
     loading.value = false
   }
 }
+
+onBeforeUnmount(() => {
+  if (videoUrl.value) URL.revokeObjectURL(videoUrl.value)
+})
 
 onMounted(loadEvents)
 </script>
@@ -140,9 +167,17 @@ onMounted(loadEvents)
       </div>
 
       <aside class="right-column">
-        <div class="video-card">
-          <div class="video-mark"></div>
-          <strong>结果视频</strong>
+        <div class="video-card" @click="openFullVideo">
+          <video
+            v-if="videoUrl"
+            :src="videoUrl"
+            class="result-video"
+            controls
+          />
+          <template v-else>
+            <div class="video-mark"></div>
+            <strong>结果视频</strong>
+          </template>
         </div>
         <div class="track-card">
           <h3>轨迹数据</h3>
@@ -153,6 +188,11 @@ onMounted(loadEvents)
         </div>
       </aside>
     </section>
+
+    <div v-if="fullVideoUrl" class="video-overlay" @click.self="closeFullVideo">
+      <button class="close-btn" @click="closeFullVideo">✕</button>
+      <video :src="fullVideoUrl" class="full-video" controls autoplay />
+    </div>
   </div>
 </template>
 
@@ -292,6 +332,46 @@ onMounted(loadEvents)
   background: #050b14;
   color: #d6e4f2;
   font-size: 18px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.result-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.video-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn {
+  position: absolute;
+  top: 20px;
+  right: 28px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  font-size: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.full-video {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 8px;
+  box-shadow: 0 0 60px rgba(0, 216, 255, 0.15);
 }
 
 .video-mark {

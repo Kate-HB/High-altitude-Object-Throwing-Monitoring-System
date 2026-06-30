@@ -39,6 +39,9 @@ def validate_file_path(rel_path: str) -> Path | None:
     if not rel_path:
         return None
 
+    # Normalize: replace backslashes with forward slashes for URL safety
+    rel_path = rel_path.replace("\\", "/")
+
     p = Path(rel_path)
 
     # Rule 1 — no absolute paths

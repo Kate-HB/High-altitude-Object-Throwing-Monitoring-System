@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { fetchEvents, updateEventStatus } from '../api/events'
+import { fetchFile } from '../api/files'
 
 const demoEvents = [
   { id: 1, created_at: '06-25 20:10', type: '疑似抛物事件', confidence: 0.82, status: 'unconfirmed', track_id: 12 },
@@ -15,6 +16,8 @@ const demoEvents = [
 const events = ref(demoEvents)
 const selectedEvent = ref(demoEvents[0])
 const loading = ref(false)
+const snapshotUrl = ref(null)
+const previewUrl = ref(null)
 
 const page = ref(1)
 const pageSize = 7
@@ -27,9 +30,21 @@ function goPage(p) {
   page.value = Math.max(1, Math.min(totalPages.value, p))
 }
 
-function selectEvent(event) {
+async function selectEvent(event) {
   selectedEvent.value = event
+  if (snapshotUrl.value) { URL.revokeObjectURL(snapshotUrl.value); snapshotUrl.value = null }
+  if (event.snapshot_path) {
+    try {
+      const res = await fetchFile(event.snapshot_path)
+      snapshotUrl.value = URL.createObjectURL(res.data)
+    } catch { /* ignore */ }
+  }
 }
+
+function openPreview() {
+  if (snapshotUrl.value) previewUrl.value = snapshotUrl.value
+}
+function closePreview() { previewUrl.value = null }
 
 async function setEventStatus(status) {
   if (!selectedEvent.value) return
@@ -53,6 +68,13 @@ async function loadEvents() {
         created_at: item.created_at || '--',
       }))
       selectedEvent.value = events.value[0]
+      const first = events.value[0]
+      if (first?.snapshot_path) {
+        try {
+          const r = await fetchFile(first.snapshot_path)
+          snapshotUrl.value = URL.createObjectURL(r.data)
+        } catch { /* ignore */ }
+      }
     }
   } catch {
     events.value = demoEvents
@@ -61,6 +83,10 @@ async function loadEvents() {
     loading.value = false
   }
 }
+
+onBeforeUnmount(() => {
+  if (snapshotUrl.value) URL.revokeObjectURL(snapshotUrl.value)
+})
 
 onMounted(loadEvents)
 </script>
@@ -103,9 +129,18 @@ onMounted(loadEvents)
       </div>
 
       <aside class="right-column">
-        <div class="snapshot-card">
-          <div class="snapshot-mark"></div>
-          <strong>事件截图</strong>
+        <div class="snapshot-card" @click="openPreview">
+          <img
+            v-if="snapshotUrl"
+            :src="snapshotUrl"
+            class="snapshot-img"
+            alt="事件截图"
+            title="点击查看大图"
+          />
+          <template v-else>
+            <div class="snapshot-mark"></div>
+            <strong>事件截图</strong>
+          </template>
         </div>
         <div class="detail-card">
           <h3>事件详情</h3>
@@ -116,6 +151,11 @@ onMounted(loadEvents)
         </div>
       </aside>
     </section>
+
+    <!-- Preview overlay -->
+    <div v-if="previewUrl" class="preview-overlay" @click="closePreview">
+      <img :src="previewUrl" class="preview-image" @click.stop alt="事件截图大图" />
+    </div>
   </div>
 </template>
 
@@ -260,6 +300,14 @@ onMounted(loadEvents)
   background: #050b14;
   color: #d6e4f2;
   font-size: 18px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.snapshot-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .snapshot-mark {
@@ -285,5 +333,26 @@ onMounted(loadEvents)
   color: #91a8c7;
   font-size: 16px;
   line-height: 1.35;
+}
+
+/* Preview overlay */
+.preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.preview-image {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 0 60px rgba(0, 216, 255, 0.15);
+  cursor: default;
 }
 </style>

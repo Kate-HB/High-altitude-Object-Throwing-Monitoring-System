@@ -31,7 +31,11 @@ def list_events(
         params.append(status)
 
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-    query = f"SELECT * FROM events {where} ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    query = f"""SELECT e.*, t.result_video_path AS task_result_video_path
+                FROM events e
+                LEFT JOIN video_tasks t ON e.video_task_id = t.id
+                {where}
+                ORDER BY e.created_at DESC LIMIT ? OFFSET ?"""
     params.extend([limit, offset])
 
     rows = db.execute(query, params).fetchall()
