@@ -11,7 +11,6 @@ from typing import Any, Generator
 import cv2
 import numpy as np
 
-from backend.app.services.camera_ai import CameraAISession
 from backend.app.services.event_service import (
     batch_insert_detections,
     batch_insert_events,
@@ -161,6 +160,8 @@ def start_ai(roi: dict[str, int], settings: dict[str, Any] | None = None) -> dic
         return {"status": "error", "message": f"创建任务记录失败: {e}"}
 
     output_dir = f"outputs/task_{task_id}"
+
+    from backend.app.services.camera_ai import CameraAISession  # lazy import (needs ultralytics)
 
     try:
         session = CameraAISession(

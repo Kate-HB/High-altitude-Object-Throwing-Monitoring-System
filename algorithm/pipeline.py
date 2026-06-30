@@ -15,7 +15,6 @@ from typing import Any
 import cv2
 
 from algorithm.behavior.behavior import BehaviorAnalyzer
-from algorithm.detection.detector import Detector
 from algorithm.tracking.tracker import DeepSORTTracker
 
 
@@ -94,6 +93,8 @@ def run_video_analysis(
         imgsz = int(settings.get("imgsz", 960))
     except (TypeError, ValueError):
         imgsz = 960
+
+    from algorithm.detection.detector import Detector  # lazy import (needs ultralytics)
 
     try:
         detector = Detector(model_path, conf=conf, device=device, imgsz=imgsz)

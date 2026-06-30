@@ -40,7 +40,11 @@ def system_status(_auth: dict = Depends(verify_token)) -> dict:
         import torch  # type: ignore
 
         cuda_available = torch.cuda.is_available()
-        gpu_name = torch.cuda.get_device_name(0) if cuda_available else ""
+        try:
+            gpu_name = torch.cuda.get_device_name(0) if cuda_available else ""
+        except Exception:
+            gpu_name = ""
+            cuda_available = False
         device_type = "gpu" if cuda_available else "cpu"
     except ImportError:
         cuda_available = False

@@ -13,9 +13,11 @@ class TestHealthEndpoint:
         assert r.status_code == 200
 
     def test_top_level_status_is_ok(self):
-        """Frontend expects result.status === 'ok'."""
+        """API returns unified format with code:200 and data.status:running."""
         r = client.get("/api/health")
-        assert r.json()["status"] == "ok"
+        body = r.json()
+        assert body["code"] == 200
+        assert body["data"]["status"] == "running"
 
     def test_unified_response_format(self):
         r = client.get("/api/health")
