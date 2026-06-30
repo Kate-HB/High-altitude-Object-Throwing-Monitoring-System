@@ -43,7 +43,7 @@ def main(model_path: str, video_path: str, conf: float = 0.25):
 
 
 if __name__ == "__main__":
-    model = sys.argv[1] if len(sys.argv) > 1 else r"C:\Users\27729\Desktop\High-altitude Object Throwing Monitoring System\models\best.pt"
+    model = sys.argv[1] if len(sys.argv) > 1 else r"C:\Users\27729\Desktop\High-altitude Object Throwing Monitoring System\models\best.onnx"
     video = sys.argv[2] if len(sys.argv) > 2 else r"C:\Users\27729\Desktop\High-altitude Object Throwing Monitoring System\data\videos\demo.mp4"
     conf = float(sys.argv[3]) if len(sys.argv) > 3 else 0.25
     main(model, video, conf)
