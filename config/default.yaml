@@ -18,3 +18,6 @@ roi_required_ratio: 0.5
 
 # Cooldown in seconds — same track_id cannot re-trigger within this window
 alarm_cooldown_seconds: 10
+
+# YOLO inference image size — must match training imgsz
+imgsz: 960

@@ -90,7 +90,12 @@ def run_video_analysis(
         conf = 0.35
 
     try:
-        detector = Detector(model_path, conf=conf, device=device)
+        imgsz = int(settings.get("imgsz", 960))
+    except (TypeError, ValueError):
+        imgsz = 960
+
+    try:
+        detector = Detector(model_path, conf=conf, device=device, imgsz=imgsz)
     except Exception as exc:
         cap.release()
         return PipelineResult(status="failed", error_message=f"模型加载失败: {exc}")

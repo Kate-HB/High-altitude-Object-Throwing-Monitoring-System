@@ -52,12 +52,18 @@
 - 默认阈值调整：min_vertical_distance 80→50, downward_ratio改为斜率法, roi_required_ratio 0.7→0.5
 - 工作日志 `docs/logs/2026-06-29-石义焌.md`
 
-## 明日计划（6月30日）
+## 明日计划（7月1日）
 
-- 结果视频优化（画质、帧率、文件大小）
-- 阈值调优（基于更多测试视频）
-- 首次完整联调（与罗龙飞配合）
-- 演示视频准备
+- ONNX推理性能对比（.pt vs .onnx 帧率/显存）
+- 阈值现场调优（基于真实场景视频）
+- 协助罗龙飞准备7/3答辩PPT算法部分
+
+### 6月30日
+- imgsz参数统一：detector.py + pipeline.py + config/default.yaml，全链路默认960
+- `scripts/export_onnx.py` — ONNX导出脚本（opset/simplify/dynamic/half）
+- `scripts/evaluate.py` — 算法指标评估（Precision/Recall/mAP50/mAP50-95）
+- `scripts/record_demo.py` — 演示视频录制（三档阈值预设：default/sensitive/strict）
+- 工作日志 `docs/logs/2026-06-30-石义焌.md`
 
 ## 技术笔记
 
