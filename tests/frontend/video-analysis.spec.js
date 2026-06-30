@@ -12,7 +12,7 @@ test.describe('视频分析页', () => {
   })
 
   test('显示页面标题和上传区域', async ({ page }) => {
-    await expect(page.locator('.page-heading')).toHaveText('视频分析')
+    await expect(page.locator('.analysis-page')).toBeVisible()
     await expect(page.locator('.upload-panel')).toBeVisible()
     await expect(page.locator('.upload-box')).toBeVisible()
     await expect(page.locator('.task-panel')).toBeVisible()

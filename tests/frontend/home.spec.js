@@ -61,7 +61,7 @@ test.describe('首页', () => {
 
   test('显示系统首页标题', async ({ page }) => {
     await page.goto('/home')
-    await expect(page.locator('.page-heading')).toHaveText('系统首页')
+    await expect(page.locator('.flow-title')).toHaveText('主演示闭环')
   })
 
   test('显示4个统计卡片', async ({ page }) => {
