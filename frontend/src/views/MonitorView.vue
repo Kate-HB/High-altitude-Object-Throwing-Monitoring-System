@@ -13,7 +13,7 @@ async function refreshStatus() {
     const res = await fetchCameraStatus()
     const data = res.data || {}
     running.value = data.status === 'online'
-    cameraIndex.value = data.camera_index ?? 0
+    cameraIndex.value = data.camera_index || 0
   } catch {
     running.value = false
   }
@@ -22,7 +22,7 @@ async function refreshStatus() {
 async function handleStart() {
   errorMsg.value = ''
   try {
-    const res = await startCamera({ camera_index: 0, width: 640, height: 480 })
+    const res = await startCamera(0, 640, 480)
     const data = res.data || {}
     if (data.status === 'error') {
       errorMsg.value = data.message || '摄像头不可用'
