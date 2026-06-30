@@ -4,18 +4,19 @@
 
 ## 当前能力
 
-- FastAPI 后端：健康检查、Token鉴权、视频上传、任务管理、后台分析线程
+- FastAPI 后端：健康检查、Token鉴权、视频上传、任务管理、后台分析线程、事件CRUD、文件服务、统计接口、参数读写、摄像头MJPEG流
 - SQLite 数据库：5张业务表（video_tasks, events, detection_results, tracking_results, system_settings）
-- Vue 3 前端：登录、首页仪表板、视频分析（上传+ROI+进度）、报警中心、历史回放、数据看板、系统设置
-- 算法接口：`run_video_analysis()` 占位，6/28切换真实YOLOv11+DeepSORT
-- 65个pytest后端测试 + 17个Playwright前端E2E测试
+- Vue 3 前端：登录、首页仪表板、视频分析（上传+ROI+进度）、报警中心、历史回放、数据看板（ECharts）、参数设置、实时监控（摄像头）
+- 算法流水线：YOLOv11检测 → IOU跟踪 → 6条件行为判断 → 结果视频（检测框+轨迹+ROI叠加）
+- ONNX推理：`models/best.onnx` (10.3 MB, opset=17)，GPU推理验证通过
+- 82个pytest后端测试 + 20个Playwright前端E2E测试 + 25项手动集成测试
 - 统一响应格式 `{code, data, message}`，前端拦截器自动解包
 
 ## 技术栈
 
 - 前端：Vue 3、Vite、Element Plus、ECharts、Axios
 - 后端：Python 3.13+、FastAPI、Uvicorn、SQLite
-- 算法：YOLOv11、OpenCV、DeepSORT、ONNX Runtime（待接入）
+- 算法：YOLOv11、OpenCV、IOU Tracker、ONNX Runtime
 - 测试：pytest、Playwright
 
 ## 目录
@@ -24,10 +25,13 @@
 algorithm/               算法流水线及检测、跟踪、行为判定
 backend/                 FastAPI应用、业务服务、数据模型
 frontend/                Vue 3前端
-scripts/                 Windows启动脚本
+scripts/                 工具脚本（启动/OONX导出/评估/演示录制/模型测试）
+config/                  算法阈值配置
+models/                  模型权重（best.pt + best.onnx）
+data/                    数据集和演示视频
 tests/
-  backend/               pytest后端测试 (65 tests)
-  frontend/              Playwright E2E测试 (17 tests)
+  backend/               pytest后端测试 (82 tests)
+  frontend/              Playwright E2E测试 (20 tests)
   algorithm/             算法单元测试
   integration/           集成测试（手动测试记录、用例表、问题清单）
 docs/                    架构和开发文档
@@ -89,9 +93,9 @@ npx playwright test
 
 | 测试套件 | 位置 | 数量 | 类型 |
 |---|---|---|---|
-| pytest | `tests/backend/` | 65 | 接口+鉴权+数据库 |
-| Playwright | `tests/frontend/` | 17 | 登录+首页+视频分析 |
-| 集成测试 | `tests/integration/` | 手动 | curl+DB验证+用例表 |
+| pytest | `tests/backend/` | 82 | 接口+鉴权+数据库 |
+| Playwright | `tests/frontend/` | 20 | 登录+首页+视频分析 |
+| 集成测试 | `tests/integration/` | 25 | 手动+curl+DB验证 |
 
 ## 文档
 

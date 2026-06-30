@@ -79,10 +79,11 @@
 - 集成问题闭环：#001-#005全部解决
 
 ### P12 — 性能与指标 (1min)
-- 算法指标（待石义焌产出）：
-  - Precision / Recall / mAP
+- 算法指标（evaluate.py已就绪，待运行完整验证集）：
+  - Precision / Recall / mAP50 / mAP50-95
   - 处理帧率（FPS）
   - 误报率 / 漏报率
+- ONNX推理：已导出best.onnx (10.3MB)，GPU推理验证通过
 - 系统指标：
   - API响应时间
   - 视频分析吞吐量
@@ -98,9 +99,11 @@
 ### P14 — 不足与展望 (1min)
 - 已知不足：
   - DeepSORT未接入（当前IOU方案功能完整，可延后替换）
-  - ONNX导出未完成（PPT中作为优化方向）
-  - 训练OOM问题（4GB显存限制，需8GB机器）
+  - 训练OOM问题（4GB显存限制，第4-6次训练OOM，需8GB机器）
   - 报警弹窗/声音未实现
+- 已解决：
+  - ONNX导出已完成并验证GPU推理（opset=17, imgsz=960, onnxruntime-gpu 1.20.1）
+  - imgsz全链路统一为960，3050 4GB推理稳定
 - 展望方向：
   - ONNX + TensorRT推理加速
   - DeepSORT替换IOU跟踪
