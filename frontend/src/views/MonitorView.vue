@@ -23,13 +23,7 @@ async function refreshStatus() {
   try {
     const res = await fetchCameraStatus()
     const data = res.data || {}
-    running.value = Boolean(data.running)
-    status.value = {
-      resolution: data.resolution || '1280×720',
-      fps: data.fps || 15,
-      device: data.device || 'laptop camera',
-      mode: data.mode || 'auxiliary demo',
-    }
+    running.value = data.status === 'online'
   } catch {
     running.value = false
   }
@@ -37,10 +31,10 @@ async function refreshStatus() {
 
 async function handleStart() {
   try {
-    await startCamera()
+    await startCamera(0, 640, 480)
     running.value = true
   } catch {
-    running.value = true
+    running.value = false
   }
 }
 
