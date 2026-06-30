@@ -18,16 +18,17 @@ class Detector:
     """Thin wrapper around YOLOv11 inference.
 
     Usage:
-        det = Detector("models/best.pt", conf=0.35, device="0")
+        det = Detector("models/best.pt", conf=0.35, device="0", imgsz=960)
         detections = det.predict_frame(frame)  # list[dict]
     """
 
-    def __init__(self, model_path: str, conf: float = 0.35, device: str = "0") -> None:
+    def __init__(self, model_path: str, conf: float = 0.35, device: str = "0", imgsz: int = 960) -> None:
         if not Path(model_path).exists():
             raise FileNotFoundError(f"模型文件不存在: {model_path}")
         self.model = YOLO(model_path)
         self.conf = conf
         self.device = device
+        self.imgsz = imgsz
 
     def predict_frame(self, frame: np.ndarray, frame_id: int) -> list[dict[str, Any]]:
         """Run detection on a single frame, return DetectionInfo list.
@@ -35,7 +36,9 @@ class Detector:
         Each dict has: frame_id, bbox_x, bbox_y, bbox_width, bbox_height,
         confidence, class_name.
         """
-        results = self.model.predict(frame, conf=self.conf, device=self.device, verbose=False, stream=False)
+        results = self.model.predict(
+            frame, conf=self.conf, imgsz=self.imgsz, device=self.device, verbose=False, stream=False,
+        )
         detections: list[dict[str, Any]] = []
         for r in results:
             if r.boxes is None:
@@ -61,6 +64,7 @@ class Detector:
         return self.model.predict(
             source=video_path,
             conf=conf or self.conf,
+            imgsz=self.imgsz,
             device=self.device,
             stream=True,
             verbose=False,
