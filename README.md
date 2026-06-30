@@ -7,7 +7,7 @@
 - FastAPI 后端：健康检查、Token鉴权、视频上传、任务管理、后台分析线程、事件CRUD、文件服务、统计接口、参数读写、摄像头MJPEG流
 - SQLite 数据库：5张业务表（video_tasks, events, detection_results, tracking_results, system_settings）
 - Vue 3 前端：登录、首页仪表板、视频分析（上传+ROI+进度）、报警中心、历史回放、数据看板（ECharts）、参数设置、实时监控（摄像头）
-- 算法流水线：YOLOv11检测 → IOU跟踪 → 6条件行为判断 → 结果视频（检测框+轨迹+ROI叠加）
+- 算法流水线：YOLOv11检测 → DeepSORT跟踪 → 6条件行为判断 → 结果视频（检测框+轨迹+ROI叠加）
 - ONNX推理：`models/best.onnx` (10.3 MB, opset=17)，GPU推理验证通过
 - 82个pytest后端测试 + 20个Playwright前端E2E测试 + 25项手动集成测试
 - 统一响应格式 `{code, data, message}`，前端拦截器自动解包
@@ -59,6 +59,7 @@ Set-Location ..
 
 ```powershell
 .\scripts\start-backend.ps1
+.\scripts\start-backend-conda.ps1
 ```
 
 新开 PowerShell，在项目根目录启动前端：

@@ -12,6 +12,7 @@ const DEFAULTS = {
   min_track_frames: 5,
   roi_required_ratio: 0.5,
   alarm_cooldown_seconds: 10,
+  imgsz: 960,
 }
 
 const RULES = {
@@ -21,6 +22,7 @@ const RULES = {
   min_track_frames: { min: 1, max: 100, label: '最小跟踪帧数' },
   roi_required_ratio: { min: 0, max: 1.0, label: 'ROI内轨迹占比' },
   alarm_cooldown_seconds: { min: 0, max: 300, label: '报警冷却秒数' },
+  imgsz: { min: 320, max: 1920, label: '推理图像尺寸' },
 }
 
 const TOOLTIPS = {
@@ -30,6 +32,7 @@ const TOOLTIPS = {
   min_track_frames: '目标最少被连续跟踪的帧数，低于此不触发（1-100）',
   roi_required_ratio: '轨迹点必须在ROI内的最低占比（0-1.0）',
   alarm_cooldown_seconds: '同一track_id两次报警的最小间隔秒数（0-300）',
+  imgsz: 'YOLO推理时的输入图像尺寸，须与训练时一致（320-1920）',
 }
 
 const form = reactive({ ...DEFAULTS })
@@ -88,7 +91,7 @@ defineOptions({ name: 'SettingsView' })
 
 <template>
   <div class="settings-page">
-    <h2 class="page-heading">参数设置</h2>
+
 
     <div class="form-card" v-loading="loading">
       <div class="form-grid">
@@ -103,7 +106,7 @@ defineOptions({ name: 'SettingsView' })
             v-model="form[key]"
             :min="rule.min"
             :max="rule.max"
-            :step="key.includes('ratio') || key.includes('confidence') ? 0.05 : 1"
+            :step="key === 'imgsz' ? 32 : key.includes('ratio') || key.includes('confidence') ? 0.05 : 1"
             :precision="key.includes('ratio') || key.includes('confidence') ? 2 : 0"
             size="small"
             controls-position="right"

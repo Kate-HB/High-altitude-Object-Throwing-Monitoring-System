@@ -13,11 +13,12 @@ DDL_STATEMENTS = [
     """CREATE TABLE IF NOT EXISTS system_settings (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         detect_confidence REAL DEFAULT 0.35,
-        downward_ratio REAL DEFAULT 0.7,
-        min_vertical_distance INTEGER DEFAULT 80,
+        downward_ratio REAL DEFAULT 0.55,
+        min_vertical_distance INTEGER DEFAULT 50,
         min_track_frames INTEGER DEFAULT 5,
-        roi_required_ratio REAL DEFAULT 0.7,
+        roi_required_ratio REAL DEFAULT 0.5,
         alarm_cooldown_seconds INTEGER DEFAULT 10,
+        imgsz INTEGER DEFAULT 960,
         updated_at TEXT DEFAULT (datetime('now','localtime'))
     )""",
     """CREATE TABLE IF NOT EXISTS video_tasks (
@@ -88,6 +89,11 @@ def init_db() -> None:
     conn.execute("PRAGMA foreign_keys=ON")
     for stmt in DDL_STATEMENTS:
         conn.execute(stmt)
+    # Safe migrations for columns added after initial schema
+    try:
+        conn.execute("ALTER TABLE system_settings ADD COLUMN imgsz INTEGER DEFAULT 960")
+    except sqlite3.OperationalError:
+        pass  # column already exists
     conn.commit()
     conn.close()
 

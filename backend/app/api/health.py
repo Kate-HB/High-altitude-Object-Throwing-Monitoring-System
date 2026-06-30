@@ -11,14 +11,11 @@ router = APIRouter(tags=["system"])
 @router.get("/health")
 def health() -> dict:
     settings = get_settings()
-    return {
-        "status": "ok",
-        **success_response(
-            {
-                "status": "running",
-                "service": settings.app_name,
-                "version": settings.app_version,
-                "time": now_str(),
-            }
-        ),
-    }
+    return success_response(
+        {
+            "status": "running",
+            "service": settings.app_name,
+            "version": settings.app_version,
+            "time": now_str(),
+        }
+    )

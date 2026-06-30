@@ -16,7 +16,16 @@ const events = ref(demoEvents)
 const selectedEvent = ref(demoEvents[0])
 const loading = ref(false)
 
+const page = ref(1)
+const pageSize = 7
+const totalPages = computed(() => Math.max(1, Math.ceil(events.value.length / pageSize)))
+const pagedEvents = computed(() => events.value.slice((page.value - 1) * pageSize, page.value * pageSize))
+
 const latestAlarm = computed(() => events.value.find(item => item.status === 'unconfirmed') || events.value[0])
+
+function goPage(p) {
+  page.value = Math.max(1, Math.min(totalPages.value, p))
+}
 
 function selectEvent(event) {
   selectedEvent.value = event
@@ -75,7 +84,7 @@ onMounted(loadEvents)
           <span>状态</span>
         </div>
         <button
-          v-for="event in events"
+          v-for="event in pagedEvents"
           :key="event.id"
           class="table-row"
           :class="{ active: selectedEvent?.id === event.id }"
@@ -86,6 +95,11 @@ onMounted(loadEvents)
           <span>{{ Number(event.confidence || 0).toFixed(2) }}</span>
           <span>{{ event.status === 'unconfirmed' ? '未确认' : event.status }}</span>
         </button>
+      <div class="pager" v-if="totalPages > 1">
+        <button :disabled="page <= 1" @click="goPage(page - 1)">上一页</button>
+        <span>第 {{ page }} / {{ totalPages }} 页</span>
+        <button :disabled="page >= totalPages" @click="goPage(page + 1)">下一页</button>
+      </div>
       </div>
 
       <aside class="right-column">
@@ -203,6 +217,35 @@ onMounted(loadEvents)
 .table-row:hover,
 .table-row.active {
   background: rgba(0, 216, 255, 0.06);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 16px 0 4px;
+  color: #91a8c7;
+  font-size: 14px;
+}
+.pager button {
+  min-width: 80px;
+  height: 36px;
+  padding: 0 16px;
+  color: #eaf6ff;
+  background: #101f33;
+  border: 1px solid #1e3a5f;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.pager button:hover:not(:disabled) {
+  background: rgba(0, 216, 255, 0.12);
+}
+.pager button:disabled {
+  color: #52657f;
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .right-column {

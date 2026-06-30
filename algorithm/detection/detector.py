@@ -22,7 +22,7 @@ class Detector:
         detections = det.predict_frame(frame)  # list[dict]
     """
 
-    def __init__(self, model_path: str, conf: float = 0.35, device: str = "0", imgsz: int = 960) -> None:
+    def __init__(self, model_path: str, conf: float = 0.25, device: str = "0", imgsz: int = 960) -> None:
         if not Path(model_path).exists():
             raise FileNotFoundError(f"模型文件不存在: {model_path}")
         self.model = YOLO(model_path)

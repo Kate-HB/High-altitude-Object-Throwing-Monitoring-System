@@ -147,22 +147,33 @@ def _run_analysis(task_id: int, roi: dict[str, int], settings: dict[str, Any]) -
             "--output-dir", output_dir,
             "--roi", json.dumps(roi or {}),
             "--settings", json.dumps(settings),
-            "--model", str(_PROJECT_ROOT / "models" / "best.pt"),
+            "--model", str(_PROJECT_ROOT / "models" / "best.onnx"),
         ]
         proc = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
+            encoding="utf-8",
             timeout=600,
             cwd=str(_PROJECT_ROOT),
-            env={**__import__("os").environ, "KMP_DUPLICATE_LIB_OK": "1"},
+            env={**__import__("os").environ, "KMP_DUPLICATE_LIB_OK": "1", "PYTHONIOENCODING": "utf-8"},
         )
         if proc.returncode != 0:
             logger.error("Task %d: pipeline subprocess failed, rc=%d stderr=%s", task_id, proc.returncode, proc.stderr[-500:])
             update_task(task_id, status="failed", error_message="算法子进程异常退出")
             return
 
-        result_data = json.loads(proc.stdout)
+        if not proc.stdout.strip():
+            logger.error("Task %d: pipeline stdout empty, rc=%d stderr=%s", task_id, proc.returncode, proc.stderr[-1000:])
+            update_task(task_id, status="failed", error_message="算法子进程无输出")
+            return
+
+        # Extract last JSON object from stdout (ultralytics may print loading info)
+        stdout_text = proc.stdout.strip()
+        json_start = stdout_text.rfind('{"status"')
+        if json_start > 0:
+            stdout_text = stdout_text[json_start:]
+        result_data = json.loads(stdout_text)
         status_val = result_data.get("status", "failed")
 
         if status_val == "success":

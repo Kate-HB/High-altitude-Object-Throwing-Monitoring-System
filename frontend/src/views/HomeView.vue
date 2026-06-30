@@ -20,9 +20,8 @@ const statCards = computed(() => [
 ])
 
 const trendBars = computed(() => {
-  const data = overview.value.daily_trend?.length ? overview.value.daily_trend : [
-    { count: 1 }, { count: 2 }, { count: 3 }, { count: 1 }, { count: 2 }, { count: 3 },
-  ]
+  const data = overview.value.daily_trend || []
+  if (!data.length) return []
   const max = Math.max(...data.map((item) => item.count || 0), 1)
   return data.slice(-6).map((item, index) => ({
     key: item.date || index,
@@ -78,7 +77,7 @@ onMounted(async () => {
     <section class="content-grid">
       <div class="chart-card">
         <h3 class="section-title">近7日事件趋势</h3>
-        <div class="bar-chart">
+        <div class="bar-chart" v-if="trendBars.length">
           <i
             v-for="bar in trendBars"
             :key="bar.key"
@@ -86,6 +85,7 @@ onMounted(async () => {
             :style="{ height: `${bar.height}px` }"
           ></i>
         </div>
+        <div v-else class="empty-chart">暂无趋势数据</div>
       </div>
 
       <div class="table-card">
@@ -104,7 +104,7 @@ onMounted(async () => {
 
     <section class="flow-card">
       <h3 class="flow-title">主演示闭环</h3>
-      <p>登录 → 上传视频 → ROI → YOLOv11检测 → DeepSORT跟踪 → 轨迹判断 → 报警 → 入库 → 历史回放 → 数据看板</p>
+      <p>登录 → 上传视频 → ROI → YOLOv11检测 → DeepSORT处理 → 轨迹判断 → 报警 → 入库 → 历史回放 → 数据看板</p>
     </section>
   </div>
 </template>
@@ -203,6 +203,15 @@ onMounted(async () => {
   width: 32px;
   border-radius: 4px;
   background: linear-gradient(180deg, #16c9e4, #0e8aa4);
+}
+
+.empty-chart {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #52657f;
+  font-size: 14px;
 }
 
 .table-card {

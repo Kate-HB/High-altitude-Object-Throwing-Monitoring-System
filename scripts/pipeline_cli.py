@@ -8,13 +8,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
+import os
 import sys
+from io import StringIO
 from pathlib import Path
+
+# Suppress ultralytics logging noise
+logging.getLogger("ultralytics").setLevel(logging.ERROR)
+os.environ["ULTRALYTICS_VERBOSE"] = "False"
 
 # Ensure project root on path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from algorithm.pipeline import PipelineResult, run_video_analysis  # noqa: E402
 
 
 def main() -> None:
@@ -23,7 +28,7 @@ def main() -> None:
     parser.add_argument("--output-dir", required=True, help="Output directory")
     parser.add_argument("--roi", required=True, help="ROI as JSON: {x,y,width,height}")
     parser.add_argument("--settings", required=True, help="Settings as JSON")
-    parser.add_argument("--model", default="models/best.pt", help="Model weights path")
+    parser.add_argument("--model", default="models/best.onnx", help="Model weights path")
     parser.add_argument("--device", default="0", help="CUDA device")
     args = parser.parse_args()
 
@@ -31,20 +36,29 @@ def main() -> None:
         roi = json.loads(args.roi)
         settings = json.loads(args.settings)
     except json.JSONDecodeError as exc:
-        result = PipelineResult(status="failed", error_message=f"JSON参数解析失败: {exc}")
-        json.dump(result.__dict__, sys.stdout, ensure_ascii=False, default=str)
+        result = {"status": "failed", "error_message": f"JSON参数解析失败: {exc}"}
+        json.dump(result, sys.stdout, ensure_ascii=False, default=str)
         return
 
-    result = run_video_analysis(
-        video_path=args.video,
-        output_dir=args.output_dir,
-        roi=roi,
-        settings=settings,
-        model_path=args.model,
-        device=args.device,
-    )
+    # Import here so import-time prints are captured
+    # Redirect stdout to suppress ultralytics ONNX loading messages
+    _real_stdout = sys.stdout
+    sys.stdout = StringIO()
+    try:
+        from algorithm.pipeline import run_video_analysis  # noqa: E402
 
-    # Output as JSON-dict (dataclass fields)
+        result = run_video_analysis(
+            video_path=args.video,
+            output_dir=args.output_dir,
+            roi=roi,
+            settings=settings,
+            model_path=args.model,
+            device=args.device,
+        )
+    finally:
+        sys.stdout = _real_stdout
+
+    # Output clean JSON to real stdout
     output = {
         "status": result.status,
         "total_frames": result.total_frames,

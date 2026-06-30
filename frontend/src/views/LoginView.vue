@@ -21,7 +21,7 @@ async function handleLogin() {
     // 响应拦截器已自动解包 {code, data, message}，res.data 即业务数据
     if (res.data?.token) {
       localStorage.setItem('token', res.data.token)
-      localStorage.setItem('token_expire', String(Date.now() + 3600000))
+      localStorage.setItem('token_expire', String(Date.now() + 86400000))
       router.push('/')
     } else {
       errorMsg.value = '登录失败'

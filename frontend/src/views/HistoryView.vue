@@ -13,10 +13,24 @@ const demoEvents = [
   { id: 8, created_at: '06-25 20:17', type: '疑似抛物事件', confidence: 0.54, status: 'unconfirmed', track_id: 19 },
 ]
 
-const events = ref(demoEvents)
+const allEvents = ref(demoEvents)
 const selectedEvent = ref(demoEvents[0])
 const loading = ref(false)
 const filters = ref({ status: '', start: '', end: '', confidence: '' })
+
+const page = ref(1)
+const pageSize = 7
+
+const filteredEvents = computed(() => {
+  let list = allEvents.value
+  const f = filters.value
+  if (f.status) list = list.filter(e => e.status === f.status)
+  if (f.confidence) list = list.filter(e => Number(e.confidence || 0) >= Number(f.confidence))
+  return list
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredEvents.value.length / pageSize)))
+const pagedEvents = computed(() => filteredEvents.value.slice((page.value - 1) * pageSize, page.value * pageSize))
 
 const trackInfo = computed(() => ({
   track_id: selectedEvent.value?.track_id ?? 12,
@@ -25,25 +39,36 @@ const trackInfo = computed(() => ({
   timestamp: '00:04.72',
 }))
 
+function goPage(p) {
+  page.value = Math.max(1, Math.min(totalPages.value, p))
+}
+
 function selectEvent(event) {
   selectedEvent.value = event
+}
+
+function doQuery() {
+  page.value = 1
+  loadEvents()
 }
 
 async function loadEvents() {
   loading.value = true
   try {
-    const res = await fetchEvents({ limit: 50 })
+    const params = { limit: 200 }
+    if (filters.value.status) params.status = filters.value.status
+    const res = await fetchEvents(params)
     const list = res.data?.events || []
     if (list.length) {
-      events.value = list.map(item => ({
+      allEvents.value = list.map(item => ({
         ...item,
         type: '疑似抛物事件',
         created_at: item.created_at || '--',
       }))
-      selectedEvent.value = events.value[0]
+      selectedEvent.value = allEvents.value[0]
     }
   } catch {
-    events.value = demoEvents
+    allEvents.value = demoEvents
     selectedEvent.value = demoEvents[0]
   } finally {
     loading.value = false
@@ -56,11 +81,35 @@ onMounted(loadEvents)
 <template>
   <div class="history-page">
     <section class="filter-card">
-      <input v-model="filters.status" placeholder="状态" />
-      <input v-model="filters.start" placeholder="开始时间" />
-      <input v-model="filters.end" placeholder="结束时间" />
-      <input v-model="filters.confidence" placeholder="最低置信度" />
-      <button @click="loadEvents">查询</button>
+      <select v-model="filters.status">
+        <option value="">全部状态</option>
+        <option value="unconfirmed">未确认</option>
+        <option value="confirmed">已确认</option>
+        <option value="false_alarm">误报</option>
+      </select>
+      <select v-model="filters.start">
+        <option value="">开始时间</option>
+        <option value="today">今天</option>
+        <option value="3days">最近3天</option>
+        <option value="7days">最近7天</option>
+        <option value="30days">最近30天</option>
+      </select>
+      <select v-model="filters.end">
+        <option value="">结束时间</option>
+        <option value="today">今天</option>
+        <option value="3days">最近3天</option>
+        <option value="7days">最近7天</option>
+        <option value="30days">最近30天</option>
+      </select>
+      <select v-model="filters.confidence">
+        <option value="">最低置信度</option>
+        <option value="0.5">≥ 0.5</option>
+        <option value="0.6">≥ 0.6</option>
+        <option value="0.7">≥ 0.7</option>
+        <option value="0.8">≥ 0.8</option>
+        <option value="0.9">≥ 0.9</option>
+      </select>
+      <button @click="doQuery">查询</button>
     </section>
 
     <section class="history-grid">
@@ -72,7 +121,7 @@ onMounted(loadEvents)
           <span>状态</span>
         </div>
         <button
-          v-for="event in events"
+          v-for="event in pagedEvents"
           :key="event.id"
           class="table-row"
           :class="{ active: selectedEvent?.id === event.id }"
@@ -83,6 +132,11 @@ onMounted(loadEvents)
           <span>{{ Number(event.confidence || 0).toFixed(2) }}</span>
           <span>{{ event.status === 'unconfirmed' ? '未确认' : event.status }}</span>
         </button>
+      <div class="pager" v-if="totalPages > 1">
+        <button :disabled="page <= 1" @click="goPage(page - 1)">上一页</button>
+        <span>第 {{ page }} / {{ totalPages }} 页</span>
+        <button :disabled="page >= totalPages" @click="goPage(page + 1)">下一页</button>
+      </div>
       </div>
 
       <aside class="right-column">
@@ -121,7 +175,8 @@ onMounted(loadEvents)
   border-radius: 8px;
 }
 
-.filter-card input {
+.filter-card input,
+.filter-card select {
   height: 54px;
   padding: 0 24px;
   color: #eaf6ff;
@@ -194,6 +249,35 @@ onMounted(loadEvents)
 .table-row:hover,
 .table-row.active {
   background: rgba(0, 216, 255, 0.06);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 16px 0 4px;
+  color: #91a8c7;
+  font-size: 14px;
+}
+.pager button {
+  min-width: 80px;
+  height: 36px;
+  padding: 0 16px;
+  color: #eaf6ff;
+  background: #101f33;
+  border: 1px solid #1e3a5f;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.pager button:hover:not(:disabled) {
+  background: rgba(0, 216, 255, 0.12);
+}
+.pager button:disabled {
+  color: #52657f;
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .right-column {

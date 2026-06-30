@@ -1,9 +1,15 @@
 <script setup>
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { SwitchButton } from '@element-plus/icons-vue'
+import { fetchHealth } from '../api/health'
+import { fetchSystemStatus } from '../api/system'
 
 const route = useRoute()
 const router = useRouter()
+
+const backendOnline = ref(false)
+const algoOnline = ref(false)
 
 const menuItems = [
   { path: '/home', label: '系统首页', icon: 'home' },
@@ -20,6 +26,21 @@ function logout() {
   localStorage.removeItem('token_expire')
   router.push('/login')
 }
+
+onMounted(async () => {
+  try {
+    const h = await fetchHealth()
+    backendOnline.value = h?.code === 200
+  } catch {
+    backendOnline.value = false
+  }
+  try {
+    const s = await fetchSystemStatus()
+    algoOnline.value = s.data?.algorithm?.status === 'ready'
+  } catch {
+    algoOnline.value = false
+  }
+})
 </script>
 
 <template>
@@ -30,11 +51,11 @@ function logout() {
       </div>
       <div class="top-right">
         <div class="status-group">
-          <span class="status-item" :class="{ online: true }">
-            后端在线
+          <span class="status-item" :class="{ online: backendOnline }">
+            {{ backendOnline ? '后端在线' : '后端离线' }}
           </span>
-          <span class="status-item">
-            GPU Ready
+          <span class="status-item" :class="{ online: algoOnline }">
+            {{ algoOnline ? 'GPU Ready' : 'GPU Offline' }}
           </span>
         </div>
         <span class="user-tag">用户：admin</span>

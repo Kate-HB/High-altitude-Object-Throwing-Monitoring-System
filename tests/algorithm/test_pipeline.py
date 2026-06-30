@@ -1,18 +1,16 @@
 from algorithm.pipeline import run_video_analysis, PipelineResult
 
 
-def test_pipeline_reports_model_not_loaded():
+def test_pipeline_reports_video_not_found():
     result = run_video_analysis(
-        video_path="demo.mp4",
+        video_path="nonexistent_video.mp4",
         output_dir="outputs/task_1/",
         roi={"x": 0, "y": 0, "width": 100, "height": 100},
         settings={"detect_confidence": 0.5},
     )
 
-    assert result == PipelineResult(
-        status="not_ready",
-        error_message="Detection model is not loaded",
-    )
+    assert result.status == "failed"
+    assert "视频" in result.error_message
 
 
 def test_run_video_analysis_returns_all_fields():

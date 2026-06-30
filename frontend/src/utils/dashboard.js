@@ -1,5 +1,5 @@
 export function formatHealthStatus(health) {
-  return health?.status === 'running' || health?.status === 'ok'
+  return health?.code === 200
 }
 
 export function normalizeOverview(overview) {

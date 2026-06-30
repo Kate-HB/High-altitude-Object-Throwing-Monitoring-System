@@ -9,11 +9,12 @@ from backend.app.core.database import get_db
 # Parameter validation ranges
 VALID_RANGES = {
     "detect_confidence": (0.1, 1.0),
-    "downward_ratio": (0.5, 1.0),
+    "downward_ratio": (0.1, 1.0),
     "min_vertical_distance": (10, 500),
     "min_track_frames": (1, 100),
     "roi_required_ratio": (0.0, 1.0),
     "alarm_cooldown_seconds": (0, 300),
+    "imgsz": (320, 1920),
 }
 
 

@@ -16,7 +16,7 @@ import cv2
 
 from algorithm.behavior.behavior import BehaviorAnalyzer
 from algorithm.detection.detector import Detector
-from algorithm.tracking.tracker import IOUTracker
+from algorithm.tracking.tracker import DeepSORTTracker
 
 
 @dataclass
@@ -42,7 +42,8 @@ def run_video_analysis(
     roi: dict[str, int],
     settings: dict[str, Any],
     *,
-    model_path: str = "models/best.pt",
+    model_path: str = "models/yolo11s_v1.onnx",
+    #yolo11s_v1.onnx，best.onnx
     device: str = "0",
 ) -> PipelineResult:
     """Run the full detection-tracking-behavior pipeline on a video.
@@ -100,7 +101,7 @@ def run_video_analysis(
         cap.release()
         return PipelineResult(status="failed", error_message=f"模型加载失败: {exc}")
 
-    tracker = IOUTracker()
+    tracker = DeepSORTTracker()
     behavior = BehaviorAnalyzer()
 
     # ── Output dirs ──

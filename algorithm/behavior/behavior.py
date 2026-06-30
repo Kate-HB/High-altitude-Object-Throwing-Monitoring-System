@@ -47,10 +47,10 @@ class BehaviorAnalyzer:
             return None
 
         # ── Read settings with defaults ──
-        downward_ratio_thresh = float(settings.get("downward_ratio", 0.7))
-        min_vertical_distance = int(settings.get("min_vertical_distance", 80))
+        downward_ratio_thresh = float(settings.get("downward_ratio", 0.55))
+        min_vertical_distance = int(settings.get("min_vertical_distance", 50))
         min_track_frames = int(settings.get("min_track_frames", 5))
-        roi_required_ratio = float(settings.get("roi_required_ratio", 0.7))
+        roi_required_ratio = float(settings.get("roi_required_ratio", 0.5))
         cooldown = float(settings.get("alarm_cooldown_seconds", 10))
 
         total = len(trajectory)

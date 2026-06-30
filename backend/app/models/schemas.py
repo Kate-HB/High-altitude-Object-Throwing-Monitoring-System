@@ -51,9 +51,18 @@ class SettingsUpdate(BaseModel):
     min_track_frames: int
     roi_required_ratio: float
     alarm_cooldown_seconds: int
+    imgsz: int
 
 
 class CameraStartRequest(BaseModel):
     camera_index: int = 0
-    width: int = 640
-    height: int = 480
+    width: int = 1280
+    height: int = 720
+
+
+class CameraAIStartRequest(BaseModel):
+    roi_x: int = 0
+    roi_y: int = 0
+    roi_width: int | None = None
+    roi_height: int | None = None
+    detect_confidence: float | None = None
