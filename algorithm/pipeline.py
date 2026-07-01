@@ -119,6 +119,7 @@ def run_video_analysis(
 
     # Progress file for real-time polling
     progress_file = out_dir / "progress.json"
+    events_live_file = out_dir / "events_live.json"
 
     def _write_progress(fid: int, ev_count: int) -> None:
         try:
@@ -128,6 +129,15 @@ def run_video_analysis(
             ))
         except Exception:
             pass  # best-effort, don't fail the pipeline
+
+    def _write_events_live() -> None:
+        """Write accumulated events so the frontend can poll them during analysis."""
+        try:
+            events_live_file.write_text(json.dumps(
+                events, ensure_ascii=False,
+            ))
+        except Exception:
+            pass
 
     # ── Accumulators ──
     detection_results: list[dict[str, Any]] = []
@@ -229,6 +239,7 @@ def run_video_analysis(
                 cv2.imwrite(str(snap_path), frame)
                 event["snapshot_path"] = str(snap_path)
                 events.append(event)
+                _write_events_live()
 
             writer.write(frame)
             processed += 1

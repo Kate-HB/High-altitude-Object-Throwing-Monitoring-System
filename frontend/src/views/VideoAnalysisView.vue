@@ -7,6 +7,7 @@ import { fetchEvents, updateEventStatus } from '../api/events'
 import { fetchFile } from '../api/files'
 import { fetchSettings, updateSettings } from '../api/settings'
 import { normalizeTaskProgress } from '../utils/dashboard'
+import { playAlarm } from '../utils/alarm'
 
 // ── Step state ──
 const step = ref('upload') // upload | configure | running | done
@@ -368,12 +369,18 @@ function startPolling() {
       taskStatus.value = t.status
       processedFrames.value = t.processed_frames || 0
       resultVideoPath.value = t.result_video_path || ''
-      // Fetch events from dedicated endpoint
+      // Fetch events — API (DB) after completion, task live events during analysis
+      const prevCount = events.value.length
       try {
         const evRes = await fetchEvents({ task_id: taskId.value })
-        events.value = evRes.data?.events || []
+        const apiEvents = evRes.data?.events || []
+        // Prefer API events (DB), fall back to live events from task response
+        events.value = apiEvents.length > 0 ? apiEvents : (t.events || [])
       } catch {
         events.value = t.events || []
+      }
+      if (events.value.length > prevCount) {
+        playAlarm()
       }
       if (t.status === 'success' || t.status === 'failed') {
         clearInterval(pollTimer)

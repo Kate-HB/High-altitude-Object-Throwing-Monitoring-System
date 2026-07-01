@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { SwitchButton } from '@element-plus/icons-vue'
 import { fetchHealth } from '../api/health'
 import { fetchSystemStatus } from '../api/system'
+import { unlockAudio } from '../utils/alarm'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,6 +29,8 @@ function logout() {
 }
 
 onMounted(async () => {
+  // Unlock Web Audio on first user interaction (browser autoplay policy)
+  document.addEventListener('click', unlockAudio, { once: true })
   try {
     const h = await fetchHealth()
     backendOnline.value = h?.code === 200
