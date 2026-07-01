@@ -25,6 +25,17 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 _PIPELINE_CLI = _PROJECT_ROOT / "scripts" / "pipeline_cli.py"
 
 
+def _read_live_events(task_id: int) -> list[dict[str, Any]]:
+    """Read events from the pipeline's live output file during analysis."""
+    events_file = _PROJECT_ROOT / "outputs" / f"task_{task_id}" / "events_live.json"
+    try:
+        if events_file.is_file():
+            return json.loads(events_file.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return []
+
+
 # ── Task CRUD ──────────────────────────────────────────────────────────
 
 def create_task(
@@ -84,11 +95,15 @@ def get_task(task_id: int) -> dict | None:
 
     task["progress"] = round(processed / total * 100, 1) if total > 0 else 0
 
-    # Attach related events
-    events = db.execute(
-        "SELECT * FROM events WHERE video_task_id = ?", (task_id,)
-    ).fetchall()
-    task["events"] = [dict(e) for e in events]
+    # Attach related events — from live file during analysis, from DB after completion
+    if task.get("status") == "running":
+        events = _read_live_events(task_id)
+    else:
+        events = db.execute(
+            "SELECT * FROM events WHERE video_task_id = ?", (task_id,)
+        ).fetchall()
+        events = [dict(e) for e in events]
+    task["events"] = events
     db.close()
     return task
 

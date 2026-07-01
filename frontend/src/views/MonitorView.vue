@@ -9,6 +9,7 @@ import {
   stopCameraAI,
 } from '../api/camera'
 import { fetchFile } from '../api/files'
+import { playAlarm } from '../utils/alarm'
 
 // ── Camera state ──
 const running = ref(false)
@@ -28,6 +29,7 @@ const aiTotalEvents = ref(0)
 const aiLatestEvents = ref([])
 const snapshotUrls = ref({})
 let aiPollTimer = null
+let aiFirstPoll = true
 
 // ── ROI drawing ──
 const roi = ref({ x: 0, y: 0, width: null, height: null })
@@ -150,6 +152,7 @@ async function handleAIStart() {
     }
     aiEnabled.value = true
     aiTaskId.value = data.task_id
+    aiFirstPoll = true
     aiPollTimer = setInterval(refreshAIStatus, 2000)
   } catch (e) {
     errorMsg.value = e.message || 'AI启动失败'
@@ -182,6 +185,10 @@ async function refreshAIStatus() {
     aiActiveTracks.value = data.active_tracks
     const prevTotal = aiTotalEvents.value
     aiTotalEvents.value = data.total_events
+    if (!aiFirstPoll && data.total_events > prevTotal) {
+      playAlarm()
+    }
+    aiFirstPoll = false
     if (data.latest_events?.length) {
       aiLatestEvents.value = data.latest_events
       // Load snapshot images for new events

@@ -80,6 +80,9 @@ def analyze_task(
     settings = get_settings()
     settings.pop("id", None)
     settings.pop("updated_at", None)
+    # 合并前端传入的快速参数覆盖
+    if body.detect_confidence is not None:
+        settings["detect_confidence"] = body.detect_confidence
 
     start_analysis(task_id, roi, settings)
 

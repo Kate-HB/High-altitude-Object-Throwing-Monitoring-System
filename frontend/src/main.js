@@ -5,6 +5,7 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
 import './assets/main.css'
+import { unlockAudio } from './utils/alarm'
 
 const app = createApp(App)
 
@@ -19,3 +20,6 @@ app.mount('#app')
 
 // 挂到window供axios拦截器使用
 window.__router__ = router
+
+// 首次用户点击时解锁Web Audio（浏览器自动播放策略）
+document.addEventListener('click', () => unlockAudio(), { once: true })

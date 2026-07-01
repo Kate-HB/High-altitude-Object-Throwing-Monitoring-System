@@ -95,9 +95,23 @@ class BehaviorAnalyzer:
 
         avg_conf = sum(confidences) / len(confidences) if confidences else 0.0
 
+        # trajectory metrics
+        start_frame = trajectory[0][0]
+        end_frame = trajectory[-1][0]
+        start_timestamp = trajectory[0][3]
+        # 连续下降帧占比: dy>0 的相邻帧对数 / 总相邻帧对数
+        downward_pairs = sum(
+            1 for i in range(1, total) if trajectory[i][2] > trajectory[i - 1][2]
+        )
+        downward_ratio = round(downward_pairs / (total - 1), 4) if total > 1 else 0.0
+
         return {
             "track_id": track_id,
             "confidence": round(float(avg_conf), 4),
             "snapshot_path": "",  # filled by pipeline (needs output_dir)
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "start_frame": start_frame,
+            "end_frame": end_frame,
+            "timestamp": round(start_timestamp, 2),
+            "downward_ratio": downward_ratio,
         }

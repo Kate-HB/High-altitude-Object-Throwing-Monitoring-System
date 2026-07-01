@@ -1,11 +1,13 @@
 <script setup>
 defineOptions({ name: 'VideoAnalysisView' })
-import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { uploadVideo, analyzeTask, fetchTask } from '../api/videos'
 import { fetchEvents, updateEventStatus } from '../api/events'
 import { fetchFile } from '../api/files'
+import { fetchSettings, updateSettings } from '../api/settings'
 import { normalizeTaskProgress } from '../utils/dashboard'
+import { playAlarm } from '../utils/alarm'
 
 // ── Step state ──
 const step = ref('upload') // upload | configure | running | done
@@ -42,6 +44,7 @@ async function doUpload() {
     videoUrl.value = URL.createObjectURL(selectedFile.value)
     step.value = 'configure'
     await nextTick()
+    loadQuickParams()
     ElMessage.success('上传成功')
   } catch (e) {
     ElMessage.error(e.message || '上传失败')
@@ -295,6 +298,33 @@ function onKeyDown(e) {
   }
 }
 
+// ── Quick params (复刻参数设置页的检测置信度，双向同步) ──
+const quickConfidence = ref(0.35)
+
+async function loadQuickParams() {
+  try {
+    const res = await fetchSettings()
+    if (res.data?.detect_confidence !== undefined) {
+      quickConfidence.value = res.data.detect_confidence
+    }
+  } catch {
+    // keep default
+  }
+}
+
+let saveTimer = null
+function onQuickConfidenceChange(val) {
+  quickConfidence.value = val
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(async () => {
+    try {
+      await updateSettings({ detect_confidence: val })
+    } catch {
+      // silent
+    }
+  }, 400)
+}
+
 // ── Analysis ──
 const analyzing = ref(false)
 const progress = ref(0)
@@ -318,6 +348,7 @@ async function doAnalyze() {
       roi_y: roi.value.y,
       roi_width: roi.value.width,
       roi_height: roi.value.height,
+      detect_confidence: quickConfidence.value,
     })
     step.value = 'running'
     taskStatus.value = 'running'
@@ -338,12 +369,18 @@ function startPolling() {
       taskStatus.value = t.status
       processedFrames.value = t.processed_frames || 0
       resultVideoPath.value = t.result_video_path || ''
-      // Fetch events from dedicated endpoint
+      // Fetch events — API (DB) after completion, task live events during analysis
+      const prevCount = events.value.length
       try {
         const evRes = await fetchEvents({ task_id: taskId.value })
-        events.value = evRes.data?.events || []
+        const apiEvents = evRes.data?.events || []
+        // Prefer API events (DB), fall back to live events from task response
+        events.value = apiEvents.length > 0 ? apiEvents : (t.events || [])
       } catch {
         events.value = t.events || []
+      }
+      if (events.value.length > prevCount) {
+        playAlarm()
       }
       if (t.status === 'success' || t.status === 'failed') {
         clearInterval(pollTimer)
@@ -408,6 +445,8 @@ async function onFalseAlarm(eventId) {
     ElMessage.error('状态更新失败')
   }
 }
+
+onMounted(loadQuickParams)
 
 onBeforeUnmount(() => {
   if (pollTimer) clearInterval(pollTimer)
@@ -509,9 +548,18 @@ function reset() {
 
         <div class="panel params-panel">
           <h3 class="panel-title">快速参数</h3>
-          <p class="param-text">detect_confidence = 0.35</p>
-          <div class="slider-track">
-            <i></i>
+          <p class="param-text">检测置信度 = {{ quickConfidence }}</p>
+          <el-slider
+            :model-value="quickConfidence"
+            :min="0.1"
+            :max="1.0"
+            :step="0.05"
+            :show-tooltip="false"
+            class="quick-slider"
+            @input="onQuickConfidenceChange"
+          />
+          <div class="quick-marks">
+            <span>0.1</span><span>0.55</span><span>1.0</span>
           </div>
         </div>
       </div>
@@ -666,7 +714,7 @@ function reset() {
 }
 
 .params-panel {
-  height: 164px;
+  min-height: 164px;
   padding: 24px;
 }
 
@@ -708,6 +756,18 @@ function reset() {
 .button-row {
   display: flex;
   gap: 10px;
+}
+
+.quick-slider {
+  margin: 8px 0 4px;
+}
+.quick-slider :deep(.el-slider__bar) { background: #00d8ff; }
+.quick-slider :deep(.el-slider__button) { border-color: #00d8ff; }
+.quick-marks {
+  display: flex;
+  justify-content: space-between;
+  color: #52657f;
+  font-size: 11px;
 }
 
 .slider-track,
