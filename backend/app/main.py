@@ -8,6 +8,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.app.api.auth import router as auth_router
 from backend.app.api.health import router as health_router
 from backend.app.api.system import router as system_router
+from backend.app.api.events import router as events_router
+from backend.app.api.files import router as files_router
+from backend.app.api.videos import router as videos_router
+from backend.app.api.statistics import router as statistics_router
+from backend.app.api.settings import router as settings_router
+from backend.app.api.camera import router as camera_router
 from backend.app.core.config import get_settings
 from backend.app.core.database import init_db
 
@@ -52,3 +58,9 @@ app.add_middleware(
 app.include_router(health_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(system_router, prefix="/api")
+app.include_router(events_router, prefix="/api")
+app.include_router(files_router, prefix="/api")
+app.include_router(videos_router, prefix="/api")
+app.include_router(statistics_router, prefix="/api")
+app.include_router(settings_router, prefix="/api")
+app.include_router(camera_router, prefix="/api")

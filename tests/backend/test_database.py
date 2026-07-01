@@ -115,7 +115,7 @@ class TestInitDb:
                 assert row is not None
                 # Default values
                 assert row[1] == 0.35  # detect_confidence
-                assert row[2] == 0.7   # downward_ratio
+                assert row[2] == 0.55  # downward_ratio
             finally:
                 db_module._db_path = None
 

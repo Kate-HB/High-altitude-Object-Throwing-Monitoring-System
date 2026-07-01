@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
+.venv-labelimg/
 venv/
 node_modules/
 frontend/dist/
@@ -12,6 +13,7 @@ frontend/dist/
 /datasets/
 /uploads/
 /outputs/
+/runs/
 /events/
 /logs/
 /models/

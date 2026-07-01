@@ -1,5 +1,6 @@
 """Tests for GET /api/system/status — requires auth."""
 
+from unittest import mock
 from fastapi.testclient import TestClient
 
 from backend.app.main import app
@@ -73,3 +74,12 @@ class TestSystemStatusSuccess:
         assert device["device_type"] in ("cpu", "gpu")
         assert "cuda_available" in device
         assert "cpu_fallback" in device
+
+    def test_database_error_shows_error_status(self):
+        import sqlite3
+        token = _login()
+        with mock.patch("backend.app.api.system.get_db",
+                        side_effect=sqlite3.Error("connection lost")):
+            r = client.get(SYSTEM_URL, headers=_auth_header(token))
+            database = r.json()["data"]["database"]
+            assert database["status"] == "error"

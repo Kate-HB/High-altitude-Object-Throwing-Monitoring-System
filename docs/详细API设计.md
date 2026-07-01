@@ -22,8 +22,8 @@
 
 | 项目 | 内容 |
 |---|---|
-| 后端服务地址 | `http://localhost:8000` |
-| API 基础路径 | `http://localhost:8000/api` |
+| 后端服务地址 | `http://127.0.0.1:8000` |
+| API 基础路径 | `http://127.0.0.1:8000/api` |
 | 接口数据格式 | JSON |
 | 文件上传格式 | `multipart/form-data` |
 | 字符编码 | UTF-8 |
@@ -301,18 +301,13 @@ token 缺失、错误或过期时，后端返回 `401`。
 | 写入数据表 | `video_tasks` |
 | 文件写入 | `uploads/` |
 
-说明：上传视频与创建任务合并为一个接口。该接口负责保存视频并创建 `video_tasks` 记录。若前端已经绘制 ROI，可在本接口中一并提交 ROI 并启动后台分析；若前端需要先上传视频再绘制 ROI，则使用 `POST /api/tasks/{task_id}/analyze` 提交 ROI 并启动分析。
+说明：上传视频与创建任务合并为一个接口。该接口只负责保存视频并创建 `video_tasks` 记录，任务初始状态为 `pending`。ROI 统一通过 `POST /api/tasks/{task_id}/analyze` 提交，并由该接口启动后台分析。
 
 请求参数：
 
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
 |---|---|---|---|---|
 | file | file | 是 | 无 | 上传视频文件 |
-| roi_x | integer | 否 | 0 | ROI 左上角 x |
-| roi_y | integer | 否 | 0 | ROI 左上角 y |
-| roi_width | integer | 否 | 视频宽度 | ROI 宽度 |
-| roi_height | integer | 否 | 视频高度 | ROI 高度 |
-| detect_confidence | number | 否 | 0.35 | 检测置信度阈值 |
 
 支持视频格式：
 
@@ -346,7 +341,7 @@ token 缺失、错误或过期时，后端返回 `401`。
 | status | `pending` |
 | total_frames | 后端读取视频后写入 |
 | processed_frames | 初始为 0 |
-| roi_x / roi_y / roi_width / roi_height | 请求参数或默认整帧 |
+| roi_x / roi_y / roi_width / roi_height | 初始为空，分析接口提交后写入 |
 | created_at / updated_at | 当前时间 |
 
 失败响应示例：
@@ -364,9 +359,8 @@ token 缺失、错误或过期时，后端返回 `401`。
 - 正常 MP4 上传成功。
 - 上传非视频文件失败。
 - 上传损坏视频后任务进入 `failed`。
-- 未传 ROI 时默认整帧。
-- ROI 超出视频范围时返回参数错误或自动限制到画面范围。
-- 上传后再绘制 ROI 时，不应立即分析，应等待 `POST /api/tasks/{task_id}/analyze`。
+- 上传后任务保持 `pending`，不立即启动分析。
+- ROI 统一由 `POST /api/tasks/{task_id}/analyze` 提交。
 
 ### 6.2 提交 ROI 并启动分析
 
@@ -1152,7 +1146,7 @@ GET /api/files?path=outputs/result_1.mp4
 前端调用：
 
 ```html
-<img src="http://localhost:8000/api/camera/stream" />
+<img src="http://127.0.0.1:8000/api/camera/stream" />
 ```
 
 返回内容：
@@ -1318,10 +1312,10 @@ run_video_analysis(
 |---|---|---|
 | 管理员登录页 | `POST /api/auth/login` | 登录系统 |
 | 系统首页 | `GET /api/health`、`GET /api/system/status`、`GET /api/statistics/overview` | 显示服务状态和核心统计 |
-| 视频分析页 | `POST /api/videos/upload`、`POST /api/tasks/{task_id}/analyze`、`GET /api/tasks/{task_id}`、`GET /api/files` | 上传视频、提交 ROI、查询进度、播放结果 |
+| 视频分析页 | `POST /api/videos/upload`、`POST /api/tasks/{task_id}/analyze`、`GET /api/tasks/{task_id}`、`GET /api/files?path=` | 上传视频、提交 ROI、查询进度、播放结果 |
 | 实时监控页 | `POST /api/camera/start`、`GET /api/camera/status`、`GET /api/camera/stream`、`POST /api/camera/stop` | 摄像头辅演示 |
 | 报警中心页 | `GET /api/events`、`GET /api/events/{event_id}`、`PATCH /api/events/{event_id}/status` | 查看和处理报警 |
-| 历史事件页 | `GET /api/events`、`GET /api/events/{event_id}`、`GET /api/files` | 筛选、详情、回放 |
+| 历史事件页 | `GET /api/events`、`GET /api/events/{event_id}`、`GET /api/files?path=` | 筛选、详情、回放 |
 | 数据看板页 | `GET /api/statistics/overview` | 图表统计 |
 | 参数设置页 | `GET /api/settings`、`PUT /api/settings` | 参数读取和保存 |
 
@@ -1341,7 +1335,7 @@ run_video_analysis(
 | `GET /api/statistics/overview` | `events` | 无 |
 | `GET /api/settings` | `system_settings` | 无 |
 | `PUT /api/settings` | `system_settings` | `system_settings` |
-| `GET /api/files` | 无 | 无 |
+| `GET /api/files?path=` | 无 | 无 |
 | `POST /api/camera/start` | 无 | 无 |
 | `POST /api/camera/stop` | 无 | 无 |
 | `GET /api/camera/status` | 无 | 无 |
@@ -1431,7 +1425,7 @@ run_video_analysis(
 | P0 | `POST /api/tasks/{task_id}/analyze` | ROI 提交和启动分析 |
 | P0 | `GET /api/tasks/{task_id}` | 主演示进度和结果展示 |
 | P0 | `GET /api/events` | 报警、历史、看板依赖 |
-| P0 | `GET /api/files` | 结果视频和截图展示 |
+| P0 | `GET /api/files?path=` | 结果视频和截图展示 |
 | P1 | `PATCH /api/events/{event_id}/status` | 事件处置演示 |
 | P1 | `GET /api/statistics/overview` | 数据看板 |
 | P1 | `GET /api/settings`、`PUT /api/settings` | 参数设置 |
