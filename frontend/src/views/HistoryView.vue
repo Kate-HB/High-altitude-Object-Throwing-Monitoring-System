@@ -36,10 +36,11 @@ const totalPages = computed(() => Math.max(1, Math.ceil(filteredEvents.value.len
 const pagedEvents = computed(() => filteredEvents.value.slice((page.value - 1) * pageSize, page.value * pageSize))
 
 const trackInfo = computed(() => ({
-  track_id: selectedEvent.value?.track_id ?? 12,
-  start_frame: 118,
-  end_frame: 166,
-  timestamp: '00:04.72',
+  track_id: selectedEvent.value?.track_id ?? '--',
+  start_frame: selectedEvent.value?.start_frame ?? '--',
+  end_frame: selectedEvent.value?.end_frame ?? '--',
+  timestamp: selectedEvent.value?.timestamp != null ? selectedEvent.value.timestamp + 's' : '--',
+  downward_ratio: selectedEvent.value?.downward_ratio != null ? (selectedEvent.value.downward_ratio * 100).toFixed(0) + '%' : '--',
 }))
 
 function goPage(p) {
@@ -185,6 +186,7 @@ onMounted(loadEvents)
           <p>start_frame: {{ trackInfo.start_frame }}</p>
           <p>end_frame: {{ trackInfo.end_frame }}</p>
           <p>timestamp: {{ trackInfo.timestamp }}</p>
+          <p>连续下降帧占比: {{ trackInfo.downward_ratio }}</p>
         </div>
       </aside>
     </section>

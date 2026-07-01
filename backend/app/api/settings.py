@@ -23,9 +23,9 @@ def read_settings(_auth: dict = Depends(verify_token)) -> dict:
 def write_settings(body: SettingsUpdate, _auth: dict = Depends(verify_token)) -> dict:
     """Update system parameters (partial update — only provided fields)."""
     try:
-        # Only pass fields that are explicitly set (non-None for floats would be 0, so pass all)
-        # SettingsUpdate requires all fields, so pass the whole model dump
-        updated = update_settings(body.model_dump())
+        # 只传非None字段，实现部分更新
+        payload = {k: v for k, v in body.model_dump().items() if v is not None}
+        updated = update_settings(payload)
         return success_response(updated, message="参数已更新")
     except ValueError as exc:
         return error_response(400, "参数校验失败", str(exc))

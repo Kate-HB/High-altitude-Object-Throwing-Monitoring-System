@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -45,13 +45,13 @@ class EventStatusUpdate(BaseModel):
 
 
 class SettingsUpdate(BaseModel):
-    detect_confidence: float
-    downward_ratio: float
-    min_vertical_distance: int
-    min_track_frames: int
-    roi_required_ratio: float
-    alarm_cooldown_seconds: int
-    imgsz: int
+    detect_confidence: Optional[float] = None
+    downward_ratio: Optional[float] = None
+    min_vertical_distance: Optional[int] = None
+    min_track_frames: Optional[int] = None
+    roi_required_ratio: Optional[float] = None
+    alarm_cooldown_seconds: Optional[int] = None
+    imgsz: Optional[int] = None
 
 
 class CameraStartRequest(BaseModel):

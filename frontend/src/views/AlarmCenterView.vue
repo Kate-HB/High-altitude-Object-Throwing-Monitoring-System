@@ -146,8 +146,9 @@ onMounted(loadEvents)
           <h3>事件详情</h3>
           <p>状态：{{ selectedEvent?.status || 'unconfirmed' }}</p>
           <p>置信度：{{ selectedEvent ? Number(selectedEvent.confidence || 0).toFixed(2) : '0.86' }}</p>
-          <p>轨迹：连续下降帧占比 78%</p>
-          <p>ROI：命中</p>
+          <p>轨迹：连续下降帧占比 {{ selectedEvent?.downward_ratio != null ? (selectedEvent.downward_ratio * 100).toFixed(0) + '%' : '--' }}</p>
+          <p>帧范围：{{ selectedEvent?.start_frame != null ? selectedEvent.start_frame + ' – ' + selectedEvent.end_frame : '--' }}</p>
+          <p>时间戳：{{ selectedEvent?.timestamp != null ? selectedEvent.timestamp + 's' : '--' }}</p>
         </div>
       </aside>
     </section>

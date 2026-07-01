@@ -94,8 +94,8 @@ def batch_insert_events(task_id: int, events: list[dict[str, Any]]) -> int:
     for evt in events:
         db.execute(
             """INSERT INTO events (video_task_id, track_id, confidence, status,
-               snapshot_path, result_video_path)
-               VALUES (?, ?, ?, ?, ?, ?)""",
+               snapshot_path, result_video_path, start_frame, end_frame, timestamp, downward_ratio)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 task_id,
                 evt.get("track_id"),
@@ -103,6 +103,10 @@ def batch_insert_events(task_id: int, events: list[dict[str, Any]]) -> int:
                 evt.get("status", "unconfirmed"),
                 evt.get("snapshot_path"),
                 evt.get("result_video_path"),
+                evt.get("start_frame"),
+                evt.get("end_frame"),
+                evt.get("timestamp"),
+                evt.get("downward_ratio"),
             ),
         )
     db.commit()

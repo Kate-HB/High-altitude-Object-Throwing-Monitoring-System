@@ -94,6 +94,17 @@ def init_db() -> None:
         conn.execute("ALTER TABLE system_settings ADD COLUMN imgsz INTEGER DEFAULT 960")
     except sqlite3.OperationalError:
         pass  # column already exists
+    # Event trajectory summary columns (2026-07-01)
+    for col_ddl in [
+        "ALTER TABLE events ADD COLUMN start_frame INTEGER",
+        "ALTER TABLE events ADD COLUMN end_frame INTEGER",
+        "ALTER TABLE events ADD COLUMN timestamp REAL",
+        "ALTER TABLE events ADD COLUMN downward_ratio REAL",
+    ]:
+        try:
+            conn.execute(col_ddl)
+        except sqlite3.OperationalError:
+            pass  # column already exists
     conn.commit()
     conn.close()
 

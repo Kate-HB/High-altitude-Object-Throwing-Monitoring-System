@@ -41,7 +41,7 @@ def run_video_analysis(
     roi: dict[str, int],
     settings: dict[str, Any],
     *,
-    model_path: str = "models/yolo11s_v1.onnx",
+    model_path: str = "models/best.onnx",
     #yolo11s_v1.onnx，best.onnx
     device: str = "0",
 ) -> PipelineResult:
